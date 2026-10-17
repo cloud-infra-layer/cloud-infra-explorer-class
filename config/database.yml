@@ -85,20 +85,5 @@ test:
 # for a full overview on how database connection configuration can be specified.
 #
 production:
-  primary: &primary_production
-    <<: *default
-    database: cloud_infra_explorer_class_production
-    username: cloud_infra_explorer_class
-    password: <%= ENV["CLOUD_INFRA_EXPLORER_CLASS_DATABASE_PASSWORD"] %>
-  cache:
-    <<: *primary_production
-    database: cloud_infra_explorer_class_production_cache
-    migrations_paths: db/cache_migrate
-  queue:
-    <<: *primary_production
-    database: cloud_infra_explorer_class_production_queue
-    migrations_paths: db/queue_migrate
-  cable:
-    <<: *primary_production
-    database: cloud_infra_explorer_class_production_cable
-    migrations_paths: db/cable_migrate
+  <<: *default
+  url: <%= ENV.fetch("DATABASE_URL") %>
