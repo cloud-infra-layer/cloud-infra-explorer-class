@@ -1,0 +1,11 @@
+# Read about fixtures at https://api.rubyonrails.org/classes/ActiveRecord/FixtureSet.html
+
+course_development:
+  name: Course development
+  provider: aws
+  region: us-east-1
+
+course_testing:
+  name: Course testing
+  provider: aws
+  region: us-west-2

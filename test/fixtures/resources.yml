@@ -1,0 +1,20 @@
+web_server:
+  environment: course_development
+  provider: aws
+  resource_id: i-0123456789abcdef0
+  service: ec2
+  name: Course web server
+  region: us-east-1
+  metadata:
+    instance_type: t3.micro
+    state: running
+  console_url: https://console.aws.amazon.com/ec2/
+
+assets_bucket:
+  environment: course_development
+  provider: aws
+  resource_id: course-explorer-example-assets
+  service: s3
+  name: Course assets
+  metadata: {}
+  console_url: https://s3.console.aws.amazon.com/s3/
