@@ -24,7 +24,7 @@ The application uses a Ruby on Rails monolith with PostgreSQL. AWS integration w
 |---|---|
 | Ruby 3.3.12 | Programming language |
 | Rails 8.1.4 | Web application framework |
-| PostgreSQL | Relational database |
+| PostgreSQL 15+ | Relational database |
 | HTML / CSS / JavaScript | Frontend |
 | Git / GitHub | Version control and collaboration |
 | GitHub Actions | Continuous integration |
@@ -42,7 +42,7 @@ Required software:
 
 - Git
 - Ruby 3.3.12
-- PostgreSQL
+- PostgreSQL 15+
 - Bundler
 - Required system libraries for Rails
 
@@ -140,6 +140,8 @@ sudo -u postgres createuser --createdb "$USER"
 This configures a local development role capable of creating the application databases.
 
 The application's default development configuration uses local PostgreSQL. Production database credentials should be provided through environment variables.
+
+To note: The codebase utilizes ```nulls_not_distinct: true``` and ```NULLS NOT DISTINCT```, and they were only introduced starting from postgresql 15.
 
 ### 5. Initialize the database
 
