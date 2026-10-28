@@ -24,7 +24,7 @@ Every AWS resource discovered by our application must be converted into a consis
   resource_id: "i-0123456789abcdef0",
   service: "ec2",
   name: "production-server",
-  region: "us-east-1",
+  region: "us-east-2",
   metadata: {
     instance_type: "t3.micro",
     state: "running"
@@ -45,7 +45,7 @@ Every AWS resource discovered by our application must be converted into a consis
 ### Initial Scope
 
 - Provider: AWS
-- Region: us-east-1
+- Region: `us-east-2` (US East, Ohio), where the team's AWS test sandbox is set up
 - Resource types: EC2 instances and S3 buckets
 - Access: Read-only
 - Scanning: Manually triggered
@@ -67,8 +67,12 @@ Method: list_resources(connection_context)
 
 connection_context contains:
 - provider: "aws"
-- region: "us-east-1"
+- region: "us-east-2"
 - resource_types: ["ec2", "s3"]
+
+For Sprint 1, request `["ec2"]`. S3 remains part of the planned MVP but is not yet implemented.
+The adapter accepts symbol or string hash keys; values use the strings shown above.
+The region must be `us-east-2` for the initial sandbox integration.
 
 AWS credentials must be obtained securely from the environment,
 not passed through or stored in application resource records.
@@ -94,6 +98,26 @@ Each error includes:
 3. The Rails backend handles persistence and scan status.
 4. Errors must not be interpreted as an empty inventory.
 5. Failed scans must preserve previously stored resources.
+
+### Sprint 1 behavior
+
+- `CloudProvider::Adapter` is implemented in `app/services/cloud_provider/adapter.rb`.
+- EC2 discovery reads all response pages and reservations. It uses the `Name` tag,
+  falling back to the instance ID when the tag is missing or blank.
+- Metadata includes only `instance_type` and `state`; arbitrary tags and raw AWS
+  responses are not copied into metadata.
+- A successful empty discovery returns `{ resources: [], errors: [] }`.
+- If any EC2 page fails, all EC2 results from that call are discarded and a safe
+  structured error is returned. An error is not proof that resources disappeared.
+- Unsupported types produce `unsupported_resource_type`. If both EC2 and S3 are
+  requested, successful EC2 results can accompany an S3 error. The backend must
+  not treat the overall scan as a complete successful inventory or delete missing
+  resources based on it.
+- Expected failures use `credentials_unavailable`, `aws_api_error`, or
+  `network_error`, with `resource_type: "ec2"`. Raw exception messages are not
+  returned. Invalid input uses `invalid_context` and `resource_type: "connection"`.
+- This adapter performs no database writes and does not implement scan status,
+  reconciliation, or historical snapshots.
 
 
 ## 3. Component Ownership

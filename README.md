@@ -14,9 +14,11 @@ Our initial MVP focuses on:
 - Searching, pinning, and hiding resources.
 - Performing manual, read-only infrastructure scans.
 
-**Initial AWS region:** `us-east-1`
+**Initial AWS region:** `us-east-2` (US East, Ohio), where the team's AWS test sandbox is set up.
 
-The application uses a Ruby on Rails monolith with PostgreSQL. AWS integration will be added during development.
+The application uses a Ruby on Rails monolith with PostgreSQL. The initial AWS adapter supports read-only EC2 discovery; dashboard and persistence integration are still pending.
+
+See [AWS development setup](docs/aws-setup.md) for authentication, the discovery role, and the manual verification command.
 
 ## Technology Stack
 
@@ -28,7 +30,7 @@ The application uses a Ruby on Rails monolith with PostgreSQL. AWS integration w
 | HTML / CSS / JavaScript | Frontend |
 | Git / GitHub | Version control and collaboration |
 | GitHub Actions | Continuous integration |
-| AWS SDK for Ruby | Planned AWS resource discovery |
+| AWS SDK for Ruby | Read-only EC2 resource discovery |
 
 ## Local Development Setup
 
@@ -343,7 +345,7 @@ Then open http://localhost:3001.
 
 The initial Rails application, PostgreSQL configuration, repository, and continuous integration workflow are established.
 
-AWS resource discovery, application data models, and the dashboard are planned for upcoming development iterations.
+The EC2 adapter, mocked discovery tests, and manual verification script are implemented. S3 discovery, application data models, scan coordination, and the dashboard are planned for upcoming development iterations.
 
 ## Team
 
