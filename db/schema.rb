@@ -10,8 +10,33 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 0) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_27_220000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
+  create_table "environments", force: :cascade do |t|
+    t.string "name", null: false
+    t.string "provider", null: false
+    t.string "region", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+  end
+
+  create_table "resources", force: :cascade do |t|
+    t.bigint "environment_id", null: false
+    t.string "provider", null: false
+    t.string "resource_id", null: false
+    t.string "service", null: false
+    t.string "name", null: false
+    t.string "region"
+    t.jsonb "metadata", default: {}, null: false
+    t.string "console_url"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["environment_id", "provider", "region", "resource_id"], name: "index_resources_on_ec2_identity", unique: true, where: "((service)::text = 'ec2'::text)", nulls_not_distinct: true
+    t.index ["environment_id", "provider", "resource_id"], name: "index_resources_on_s3_identity", unique: true, where: "((service)::text = 's3'::text)"
+    t.index ["environment_id"], name: "index_resources_on_environment_id"
+  end
+
+  add_foreign_key "resources", "environments"
 end
