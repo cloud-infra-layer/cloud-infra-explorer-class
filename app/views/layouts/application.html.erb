@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
   <head>
-    <title><%= content_for(:title) || "Cloud Infra Explorer Class" %></title>
+    <title><%= content_for(:title) || "Cloud Infrastructure Explorer" %></title>
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="application-name" content="Cloud Infra Explorer Class">
+    <meta name="application-name" content="Cloud Infrastructure Explorer">
     <meta name="mobile-web-app-capable" content="yes">
     <%= csrf_meta_tags %>
     <%= csp_meta_tag %>
@@ -24,6 +24,10 @@
   </head>
 
   <body>
-    <%= yield %>
+    <a class="skip-link" href="#main-content">Skip to main content</a>
+    <%= render "shared/navigation" %>
+    <main id="main-content" class="main-content" tabindex="-1">
+      <%= yield %>
+    </main>
   </body>
 </html>
