@@ -1,6 +1,7 @@
 ENV["RAILS_ENV"] ||= "test"
 require_relative "../config/environment"
 require "rails/test_help"
+require_relative "support/postgresql_referential_integrity"
 
 module ActiveSupport
   class TestCase
