@@ -120,3 +120,33 @@ Each error includes:
 - Connects the adapter to the persistence layer
 - Reviews cross-component integration
 - Coordinates integration testing
+
+## 4. Sprint 1 Dashboard Contract
+
+`GET /` and `GET /dashboard` render `DashboardController#index` using
+`app/views/dashboard/index.html.erb`. The named route helper is `dashboard_path`.
+The existing `/home/index` placeholder route remains available.
+
+The controller reads stored AWS EC2 and S3 resources across **all environments**.
+It does not initiate scans or call the cloud provider adapter. Resources are
+ordered by name, then database ID, and their environments are preloaded.
+Records with the same AWS identifier in different environments remain separate;
+the prototype displays environment names to distinguish them.
+
+### Variables available to the view
+
+| Variable | Shape | Empty inventory |
+|---|---|---|
+| `@resources_by_service` | Hash from service string to an array of Resource objects | `{ "ec2" => [], "s3" => [] }` |
+| `@resource_counts` | Hash from service string to its stored resource count | `{ "ec2" => 0, "s3" => 0 }` |
+
+Both service keys always exist. Counts are derived from the same resource arrays
+shown by the view. No seed data is required for the page to render successfully.
+
+The initial template provides category anchors, counts, basic resource tables,
+and empty-state messages. The frontend developer can iterate on presentation
+using this interface. Category anchors are sections on the dashboard; separate
+category listing routes are not part of Issue #11. Environment filtering,
+pagination, authentication, and live scanning are separate work. This prototype
+loads the small Sprint 1 inventory into memory and does not provide per-user
+environment isolation.
