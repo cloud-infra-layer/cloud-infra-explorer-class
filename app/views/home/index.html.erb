@@ -1,7 +1,7 @@
 <% content_for :title, "Dashboard | Cloud Infrastructure Explorer" %>
 <h1>Dashboard</h1>
 <p class="page-description">Explore your cloud infrastructure in one place.</p>
-<section class="content-panel" aria-labelledby="welcome-heading">
-  <h2 id="welcome-heading">Your infrastructure overview</h2>
-  <p>Use the navigation to visit EC2 and S3 resources. Resource summaries will be available here soon.</p>
-</section>
+<div class="category-grid">
+  <%= render "category_card", service: "ec2", name: "EC2 Instances", count: @resource_counts.fetch("ec2", 0) %>
+  <%= render "category_card", service: "s3", name: "S3 Buckets", count: @resource_counts.fetch("s3", 0) %>
+</div>
