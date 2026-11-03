@@ -16,7 +16,7 @@ Our initial MVP focuses on:
 
 **Team sandbox region:** `us-east-2` (US East, Ohio), where the team's AWS test sandbox is set up. The adapter scans the region supplied in `connection_context`; it is not restricted to the sandbox region.
 
-The application uses a Ruby on Rails monolith with PostgreSQL. The initial AWS adapter supports read-only EC2 discovery; dashboard and persistence integration are still pending.
+The application uses a Ruby on Rails monolith with PostgreSQL. The initial AWS adapter supports read-only EC2 discovery. Environment and resource models, fictional demo seeds, and a dashboard of stored resources are implemented; wiring live scans into persistence remains pending.
 
 See [AWS development setup](docs/aws-setup.md) for authentication, the discovery role, and the manual verification command.
 
@@ -341,11 +341,25 @@ bin/rails server -p 3001
 
 Then open http://localhost:3001.
 
+## Demo inventory and dashboard
+
+After preparing the development database, load fictional resources with:
+
+```bash
+bin/rails db:seed
+```
+
+Open `/` or `/dashboard` on the running Rails server to view stored EC2 and S3 resources across all environments. Loading seeds and viewing the dashboard do not call AWS or require AWS credentials.
+
+The `Course demo` environment uses fictional `us-east-1` resources. It is separate from the team's live `us-east-2` sandbox and demonstrates that stored inventory is not restricted to the sandbox region. Rerunning seeds refreshes the demo records while preserving their database IDs and unrelated inventory. Keep the demo environment's name, provider, and region stable; changing them can create another demo environment. Manual edits to seeded resource attributes are overwritten on the next seed run.
+
+The dashboard currently reads stored records only. Running the adapter or `script/verify_ec2.rb` returns discovery results without saving them to the database.
+
 ## Development Status
 
 The initial Rails application, PostgreSQL configuration, repository, and continuous integration workflow are established.
 
-The EC2 adapter, mocked discovery tests, and manual verification script are implemented. S3 discovery, application data models, scan coordination, and the dashboard are planned for upcoming development iterations.
+The EC2 adapter, mocked discovery tests, manual verification script, environment and resource models, demo seeds, and stored-resource dashboard are implemented. S3 discovery, scan coordination, and persistence of live scan results remain planned for upcoming development iterations.
 
 ## Team
 
