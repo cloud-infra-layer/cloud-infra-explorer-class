@@ -14,7 +14,7 @@ Our initial MVP focuses on:
 - Searching, pinning, and hiding resources.
 - Performing manual, read-only infrastructure scans.
 
-**Initial AWS region:** `us-east-2` (US East, Ohio), where the team's AWS test sandbox is set up.
+**Team sandbox region:** `us-east-2` (US East, Ohio), where the team's AWS test sandbox is set up. The adapter scans the region supplied in `connection_context`; it is not restricted to the sandbox region.
 
 The application uses a Ruby on Rails monolith with PostgreSQL. The initial AWS adapter supports read-only EC2 discovery; dashboard and persistence integration are still pending.
 

@@ -1,4 +1,4 @@
-# Cloud Infrastructure Explorer — Integration Contracts
+# Cloud Infrastructure Explorer: Integration Contracts
 
 ## 1. AWS Resource Contract
 
@@ -45,7 +45,7 @@ Every AWS resource discovered by our application must be converted into a consis
 ### Initial Scope
 
 - Provider: AWS
-- Region: `us-east-2` (US East, Ohio), where the team's AWS test sandbox is set up
+- Region: one region per scan, supplied by the selected environment; the team sandbox uses `us-east-2` (US East, Ohio)
 - Resource types: EC2 instances and S3 buckets
 - Access: Read-only
 - Scanning: Manually triggered
@@ -72,7 +72,7 @@ connection_context contains:
 
 For Sprint 1, request `["ec2"]`. S3 remains part of the planned MVP but is not yet implemented.
 The adapter accepts symbol or string hash keys; values use the strings shown above.
-The region must be `us-east-2` for the initial sandbox integration.
+The region must be an AWS region code supplied by the selected environment, such as `us-east-2` or `eu-west-1`. The adapter passes it to the SDK and includes it in returned resources. Region format validation does not establish service availability or account access; AWS permissions and region availability determine whether discovery succeeds. Scans do not enumerate other regions automatically.
 
 AWS credentials must be obtained securely from the environment,
 not passed through or stored in application resource records.
@@ -104,6 +104,8 @@ Each error includes:
 - `CloudProvider::Adapter` is implemented in `app/services/cloud_provider/adapter.rb`.
 - EC2 discovery reads all response pages and reservations. It uses the `Name` tag,
   falling back to the instance ID when the tag is missing or blank.
+- Console links are generated for regions recognized by the installed SDK in the commercial AWS partition. Other regions return `console_url: nil` rather than an incorrect link.
+- Discovery does not filter by sandbox account, test tags, instance ID, instance type, or state. Credentials determine the account being scanned.
 - Metadata includes only `instance_type` and `state`; arbitrary tags and raw AWS
   responses are not copied into metadata.
 - A successful empty discovery returns `{ resources: [], errors: [] }`.

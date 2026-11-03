@@ -4,6 +4,8 @@ Sprint 1 covers issues #5 (connectivity) and #7 (adapter), tracked by #6.
 The team's sandbox uses **us-east-2 (Ohio)**. No S3 permissions or infrastructure
 write permissions are needed by the adapter.
 
+The application adapter is not restricted to this sandbox: it scans the region supplied in `connection_context` using the configured AWS credentials. It does not filter by a test instance's ID, tags, type, or state. The account-specific trust policy, Ohio discovery policy, and disposable-instance helper in this repository are team sandbox configuration, not requirements for other users. Other accounts need their own trusted principal and read-only policy for the regions they intend to scan.
+
 ## Local prerequisites
 
 Install the project's Ruby version and dependencies (`bundle install`). Install
@@ -101,8 +103,10 @@ The ARN should contain `assumed-role/CloudExplorerDiscovery/`.
 From the repository root:
 
 ```bash
-AWS_PROFILE=cloud-explorer-dev bundle exec ruby script/verify_ec2.rb
+AWS_PROFILE=cloud-explorer-dev AWS_REGION=us-east-2 bundle exec ruby script/verify_ec2.rb
 ```
+
+The verification script requires `AWS_REGION` to select the region explicitly. It has no hardcoded sandbox-region fallback; missing or malformed region input returns `invalid_context`. Use a profile authorized for the requested region. The team discovery profile remains restricted to Ohio.
 
 This calls the adapter without starting Rails or requiring PostgreSQL. It prints
 the normalized resource/error contract and exits with status 1 if discovery fails.

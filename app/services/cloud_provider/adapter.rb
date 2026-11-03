@@ -3,7 +3,6 @@ require "uri"
 
 module CloudProvider
   class Adapter
-    REGION = "us-east-2".freeze
     CREDENTIAL_ERRORS = [
       Aws::Errors::MissingCredentialsError, Aws::Errors::NoSuchProfileError,
       Aws::Errors::NoSourceProfileError, Aws::Errors::NoSourceCredentialsError,
@@ -28,10 +27,10 @@ module CloudProvider
       region = connection_context[:region] || connection_context["region"]
       types = connection_context[:resource_types] || connection_context["resource_types"]
 
-      unless provider == "aws" && region == REGION && types.is_a?(Array) &&
+      unless provider == "aws" && region.is_a?(String) && region.match?(/\A[a-z]{2}(?:-[a-z]+)+-\d+\z/) && types.is_a?(Array) &&
           types.any? && types.all? { |type| type.is_a?(String) && !type.strip.empty? }
         return failure("connection", "invalid_context",
-          "Provide provider aws, region us-east-2, and a non-empty array of resource type strings.")
+          "Provide provider aws, an AWS region code, and a non-empty array of resource type strings.")
       end
 
       result = { resources: [], errors: [] }
@@ -79,8 +78,15 @@ module CloudProvider
         name: name,
         region: region,
         metadata: { instance_type: instance.instance_type, state: instance.state&.name },
-        console_url: "https://#{region}.console.aws.amazon.com/ec2/home?region=#{region}#InstanceDetails:instanceId=#{instance_id}"
+        console_url: console_url(region, instance_id)
       }
+    end
+
+    def console_url(region, instance_id)
+      # Other partitions have different consoles; omit links we cannot construct reliably.
+      return unless Aws::Partitions.partition("aws").region?(region)
+
+      "https://#{region}.console.aws.amazon.com/ec2/home?region=#{region}#InstanceDetails:instanceId=#{instance_id}"
     end
 
     def failure(type, code, message)
