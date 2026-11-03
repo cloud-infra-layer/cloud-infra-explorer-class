@@ -65,7 +65,7 @@ class Ec2TestInstanceScriptTest < Minitest::Test
   end
 
   def test_launch_is_scoped_and_uses_secure_defaults
-    _, status = run_script("create", "test-run", "subnet-12345678")
+    output, status = run_script("create", "test-run", "subnet-12345678")
     assert status.success?
     assert calls.all? { |args| args.first(5) == [ "--profile", "cloud-explorer-setup", "--region", "us-east-2", "--no-cli-pager" ] }
     launch = calls.find { |args| args[5, 2] == [ "ec2", "run-instances" ] }
@@ -77,6 +77,7 @@ class Ec2TestInstanceScriptTest < Minitest::Test
     refute_includes launch, "--key-name"
     refute_includes launch, "--iam-instance-profile"
     assert_equal "cloud-explorer-test-run", launch[launch.index("--client-token") + 1]
+    assert_includes output, "Ready. Run: AWS_PROFILE=cloud-explorer-dev AWS_REGION=us-east-2 bundle exec ruby script/verify_ec2.rb"
   end
 
   def test_existing_instance_does_not_launch_another

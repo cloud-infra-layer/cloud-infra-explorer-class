@@ -175,7 +175,7 @@ unrelated resources. Replace the example subnet ID with your chosen subnet:
 TEST_RUN="gm3239-$(date -u +%Y%m%d%H%M%S)"
 bash script/ec2_test_instance.sh create "$TEST_RUN" subnet-REPLACE_ME
 
-AWS_PROFILE=cloud-explorer-dev bundle exec ruby script/verify_ec2.rb
+AWS_PROFILE=cloud-explorer-dev AWS_REGION=us-east-2 bundle exec ruby script/verify_ec2.rb
 
 bash script/ec2_test_instance.sh cleanup "$TEST_RUN"
 ```
@@ -239,9 +239,7 @@ On October 27, 2026, the Ruby verification script successfully called EC2 throug
 `{"resources":[],"errors":[]}`. This initial check verified discovery of an empty
 inventory.
 
-The developer subsequently reported a successful live test using run ID
-`gm3239-20261028025258` (the run ID uses UTC). The following command returned one
-normalized resource and no errors:
+The developer subsequently reported a successful live test using run ID `gm3239-20261028025258` (the run ID uses UTC). The following command returned one normalized resource and no errors. This historical run predates the explicit `AWS_REGION` requirement; use the current commands above for new verification runs:
 
 ```bash
 AWS_PROFILE=cloud-explorer-dev bundle exec ruby script/verify_ec2.rb

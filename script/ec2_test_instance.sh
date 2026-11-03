@@ -116,4 +116,4 @@ instance_id=$(aws_cli ec2 run-instances --image-id "$image_id" --instance-type t
 echo "Instance: $instance_id"
 echo "Cleanup: bash script/ec2_test_instance.sh cleanup $run_id"
 aws_cli ec2 wait instance-running --instance-ids "$instance_id"
-echo "Ready. Run: AWS_PROFILE=cloud-explorer-dev bundle exec ruby script/verify_ec2.rb"
+echo "Ready. Run: AWS_PROFILE=cloud-explorer-dev AWS_REGION=us-east-2 bundle exec ruby script/verify_ec2.rb"
