@@ -1,0 +1,25 @@
+<div class="resource-table-scroll" role="region" aria-label="Resource inventory table" tabindex="0">
+  <table class="resource-table">
+    <caption><%= caption %> — stored inventory across all environments</caption>
+    <thead>
+      <tr>
+        <th scope="col">Resource name</th>
+        <th scope="col">Service</th>
+        <th scope="col">Region</th>
+        <th scope="col">Resource ID</th>
+        <th scope="col">Metadata</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% resources.each do |resource| %>
+        <tr>
+          <th scope="row"><%= resource.name %></th>
+          <td><%= resource.service.upcase %></td>
+          <td><%= resource.region.presence || "Unknown" %></td>
+          <td class="resource-identifier"><%= resource.resource_id %></td>
+          <td><%= resource_metadata(resource) %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+</div>

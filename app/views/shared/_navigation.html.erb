@@ -1,0 +1,26 @@
+
+<header class="site-header">
+  <div class="navigation-container">
+    <%= link_to "Cloud Infrastructure Explorer", root_path, class: "brand" %>
+
+    <nav class="primary-navigation" aria-label="Primary navigation">
+      <%= link_to "Dashboard",
+          root_path,
+          aria: {
+            current: %w[home dashboard].include?(controller_name) ? "page" : nil
+          } %>
+
+      <%= link_to "EC2 Resources",
+          resources_path(service: "ec2"),
+          aria: {
+            current: controller_name == "resources" && params[:service] == "ec2" ? "page" : nil
+          } %>
+
+      <%= link_to "S3 Resources",
+          resources_path(service: "s3"),
+          aria: {
+            current: controller_name == "resources" && params[:service] == "s3" ? "page" : nil
+          } %>
+    </nav>
+  </div>
+</header>
