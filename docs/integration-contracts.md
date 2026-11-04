@@ -176,3 +176,283 @@ category listing routes are not part of Issue #11. Environment filtering,
 pagination, authentication, and live scanning are separate work. This prototype
 loads the small Sprint 1 inventory into memory and does not provide per-user
 environment isolation.
+
+
+
+---
+
+# 5. Sprint 2 Integration Contracts
+
+## Objective
+
+Sprint 2 connects AWS discovery to persistent inventory and the Rails frontend.
+
+The intended workflow is:
+
+User → Rails Controller → ScanCoordinator → CloudProvider::Adapter
+                                      ↓
+                                ResourceSync
+                                      ↓
+                                  PostgreSQL
+                                      ↓
+                                   Dashboard
+
+All cloud access remains read-only.
+
+## 5.1 Component Ownership
+
+### Cloud Integration — GS
+
+Owns:
+- `app/services/cloud_provider/`
+- AWS SDK interactions
+- EC2 and S3 discovery
+- Provider-specific error handling
+- Mocked AWS API tests
+- AWS setup documentation
+
+The adapter never writes to PostgreSQL.
+
+### Application & Data — Sam
+
+Owns:
+- `app/models/scan.rb`
+- `app/models/resource.rb`
+- Database migrations
+- `app/services/resource_sync.rb`
+- Scan persistence and resource upserts
+- Database and service tests
+
+Persistence services never call AWS APIs.
+
+### Frontend & Product — Ian
+
+Owns:
+- Rails views and frontend components
+- Manual scan controls
+- Scan status and error presentation
+- Resource listings and dashboard updates
+- Frontend and integration tests
+
+Frontend views never call AWS APIs directly.
+
+### Technical Direction & Integration — Brayden
+
+Owns:
+- `app/services/scan_coordinator.rb`
+- Scan orchestration
+- `app/controllers/scans_controller.rb`
+- Integration contracts
+- Cross-component integration tests
+- CI verification and deployment
+
+## 5.2 Cloud Provider Adapter
+
+Existing interface:
+
+CloudProvider::Adapter#list_resources(connection_context)
+
+Input:
+
+{
+  provider: "aws",
+  region: "us-east-2",
+  resource_types: ["ec2", "s3"]
+}
+
+Output:
+
+{
+  resources: [...],
+  errors: [...]
+}
+
+Each resource must follow the normalized resource contract in Section 1.
+
+Each error must contain:
+- resource_type
+- code
+- message
+
+For Sprint 2, EC2 and S3 discovery should be supported.
+
+Successful discovery of zero resources is valid.
+
+Failed discovery must never be interpreted as proof that existing resources
+have been deleted.
+
+## 5.3 Resource Persistence
+
+New service:
+
+ResourceSync
+
+Proposed interface:
+
+ResourceSync.new(environment: environment).call(resources: resources)
+
+Returns:
+
+{
+  created: 0,
+  updated: 0
+}
+
+Responsibilities:
+- Validate normalized resource records.
+- Associate resources with the selected Environment.
+- Insert newly discovered resources.
+- Update previously discovered resources.
+- Avoid duplicates on repeated scans.
+- Preserve resources belonging to other environments.
+- Never store AWS credentials or secrets.
+
+Existing resource identity rules remain unchanged:
+
+EC2:
+environment_id + provider + region + resource_id
+
+S3:
+environment_id + provider + resource_id
+
+Sprint 2 synchronization is additive/update-based.
+
+Deleting resources absent from a scan is out of scope.
+
+A failed database write must report an error rather than silently
+claiming synchronization succeeded.
+
+## 5.4 Scan Model
+
+New model: Scan
+
+A Scan belongs to an Environment.
+
+Required fields:
+- environment_id
+- status
+- resource_types (JSON array)
+- discovered_count
+- created_count
+- updated_count
+- errors (JSON array)
+- started_at
+- completed_at
+
+Allowed status values:
+- running
+- completed
+- partial
+- failed
+
+Definitions:
+
+running:
+The scan has started but has not finished.
+
+completed:
+All requested resource types were discovered and synchronized
+successfully, including valid empty results.
+
+partial:
+At least one requested resource type succeeded, but another failed.
+
+failed:
+Discovery or persistence failed without a fully successful result.
+
+The Scan record must preserve safe error information.
+
+Never save credentials or raw AWS exception messages.
+
+## 5.5 ScanCoordinator
+
+Existing constructor:
+
+ScanCoordinator.new(environment: environment, adapter: adapter)
+
+Sprint 2 extends the coordinator with a persistence service while
+retaining injectable dependencies for testing.
+
+Responsibilities:
+1. Accept an Environment and requested resource types.
+2. Create a Scan record with status running.
+3. Call CloudProvider::Adapter#list_resources.
+4. Separate successful discovery results from failed resource types.
+5. Pass only successfully discovered resource types to ResourceSync.
+6. Record resource counts and structured errors.
+7. Mark the scan completed, partial, or failed.
+8. Return the Scan result.
+
+No AWS-specific SDK logic belongs in ScanCoordinator.
+
+A failed or unsupported service must never cause existing resources
+to be deleted.
+
+Database persistence errors must result in a failed or partial scan
+rather than a false success.
+
+## 5.6 Manual Scan Endpoint
+
+Proposed route:
+
+POST /environments/:environment_id/scans
+
+Controller:
+
+ScansController#create
+
+The controller:
+- Resolves the selected Environment.
+- Validates requested resource types.
+- Invokes ScanCoordinator.
+- Redirects to the dashboard after the synchronous Sprint 2 scan.
+- Displays success, partial-success, or failure feedback.
+
+The initial implementation is synchronous.
+
+Background jobs, polling, and real-time progress updates are not
+required for Sprint 2.
+
+Ian can implement the form and status presentation using controller
+stubs until the backend is connected.
+
+Security requirement:
+
+The scan endpoint must not be publicly usable without access control.
+
+Production scan triggering must remain disabled until an appropriate
+authorization mechanism is established.
+
+## 5.7 Frontend Behavior
+
+The dashboard should display:
+- EC2 and S3 resource counts
+- A manual scan action
+- The latest scan status for the selected environment
+- Safe error messages when discovery fails
+- Updated stored resources after successful synchronization
+
+The dashboard and resource listings continue reading from PostgreSQL.
+
+They must not call CloudProvider::Adapter directly.
+
+During a scan, the frontend must not falsely indicate that inventory
+is up to date.
+
+## 5.8 Acceptance Criteria
+
+Sprint 2 is complete when:
+
+1. EC2 and S3 discovery follow the normalized adapter contract.
+2. A manual scan can be initiated through the authorized application UI.
+3. ScanCoordinator orchestrates discovery and persistence.
+4. Scan results and status are recorded in PostgreSQL.
+5. New resources are created and existing resources are updated.
+6. Repeated scans do not create duplicates.
+7. Failed or partial scans preserve existing inventory.
+8. The dashboard displays updated stored resources.
+9. Automated tests pass without requiring real AWS credentials.
+10. GitHub CI passes and the integrated application is deployed.
+
+A live AWS sandbox test should be performed using approved
+read-only credentials when the end-to-end integration is ready.
