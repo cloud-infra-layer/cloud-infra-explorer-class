@@ -1,45 +1,63 @@
+
 <% content_for :title, "Dashboard | Cloud Infrastructure Explorer" %>
 
-<main>
-  <header>
-    <h1>Cloud Infrastructure Explorer</h1>
-    <p>Stored AWS resources across all environments. This page does not perform a live AWS scan.</p>
-    <nav aria-label="Resource categories">
-      <%= link_to "EC2 instances", "#ec2-resources" %>
-      <%= link_to "S3 buckets", "#s3-resources" %>
-    </nav>
-  </header>
+<header>
+  <h1>Cloud Infrastructure Explorer</h1>
+  <p class="page-description">
+    Stored AWS resources across all environments. This page does not perform a live AWS scan.
+  </p>
 
-  <% { "ec2" => "EC2 instances", "s3" => "S3 buckets" }.each do |service, label| %>
-    <section id="<%= service %>-resources" aria-labelledby="<%= service %>-heading">
-      <h2 id="<%= service %>-heading"><%= label %></h2>
-      <p class="resource-count"><%= pluralize(@resource_counts.fetch(service), "resource") %></p>
+  <nav aria-label="Resource categories">
+    <%= link_to "EC2 instances", "#ec2-resources" %>
+    <%= link_to "S3 buckets", "#s3-resources" %>
+  </nav>
+</header>
 
-      <% if @resources_by_service.fetch(service).empty? %>
-        <p class="empty-state">No <%= label %> stored yet.</p>
-      <% else %>
-        <table>
-          <caption><%= label %> across all environments</caption>
-          <thead>
-            <tr>
-              <th scope="col">Name</th>
-              <th scope="col">Environment</th>
-              <th scope="col">Region</th>
-              <th scope="col">Resource ID</th>
+<div class="category-grid">
+  <%= render "home/category_card",
+      service: "ec2",
+      name: "EC2 Instances",
+      count: @resource_counts.fetch("ec2", 0) %>
+
+  <%= render "home/category_card",
+      service: "s3",
+      name: "S3 Buckets",
+      count: @resource_counts.fetch("s3", 0) %>
+</div>
+
+<% { "ec2" => "EC2 instances", "s3" => "S3 buckets" }.each do |service, label| %>
+  <section id="<%= service %>-resources" aria-labelledby="<%= service %>-heading">
+    <h2 id="<%= service %>-heading"><%= label %></h2>
+
+    <p class="resource-count">
+      <%= pluralize(@resource_counts.fetch(service), "resource") %>
+    </p>
+
+    <% if @resources_by_service.fetch(service).empty? %>
+      <p class="empty-state">No <%= label %> stored yet.</p>
+    <% else %>
+      <table>
+        <caption><%= label %> across all environments</caption>
+        <thead>
+          <tr>
+            <th scope="col">Name</th>
+            <th scope="col">Environment</th>
+            <th scope="col">Region</th>
+            <th scope="col">Resource ID</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          <% @resources_by_service.fetch(service).each do |resource| %>
+            <tr id="resource-<%= resource.id %>">
+              <td><%= resource.name %></td>
+              <td><%= resource.environment.name %></td>
+              <td><%= resource.region.presence || "Not specified" %></td>
+              <td><%= resource.resource_id %></td>
             </tr>
-          </thead>
-          <tbody>
-            <% @resources_by_service.fetch(service).each do |resource| %>
-              <tr id="resource-<%= resource.id %>">
-                <td><%= resource.name %></td>
-                <td><%= resource.environment.name %></td>
-                <td><%= resource.region.presence || "Not specified" %></td>
-                <td><%= resource.resource_id %></td>
-              </tr>
-            <% end %>
-          </tbody>
-        </table>
-      <% end %>
-    </section>
-  <% end %>
-</main>
+          <% end %>
+        </tbody>
+      </table>
+    <% end %>
+  </section>
+<% end %>

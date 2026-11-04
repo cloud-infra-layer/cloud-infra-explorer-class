@@ -1,0 +1,6 @@
+<%= link_to resources_path(service: service), class: "content-panel category-card" do %>
+  <h2><%= name %></h2>
+  <p class="resource-count"><%= pluralize(count, "resource") %></p>
+  <p class="category-description"><%= count.zero? ? "No stored resources yet." : "Resources stored in your inventory." %></p>
+  <span class="category-action">View <%= name %> <span aria-hidden="true">&rarr;</span></span>
+<% end %>
