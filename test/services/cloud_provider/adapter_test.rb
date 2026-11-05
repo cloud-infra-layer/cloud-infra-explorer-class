@@ -46,7 +46,7 @@ class CloudProviderAdapterTest < Minitest::Test
       assert_equal "another-workload", resource[:name]
       assert_equal({ instance_type: "m7i.large", state: "stopped" }, resource[:metadata])
       assert_equal "https://#{region}.console.aws.amazon.com/ec2/home?region=#{region}#InstanceDetails:instanceId=i-another", resource[:console_url]
-      assert_equal({}, client.api_requests.fetch(0)[:params])
+      assert_equal({ max_results: 1000 }, client.api_requests.fetch(0)[:params])
     end
   end
 
@@ -124,9 +124,9 @@ class CloudProviderAdapterTest < Minitest::Test
 
   def test_unsupported_service_is_explicit_while_ec2_can_succeed
     @client.stub_responses(:describe_instances, reservations: [ { instances: [ instance ] } ])
-    result = @adapter.list_resources(@context.merge(resource_types: [ "ec2", "s3" ]))
+    result = @adapter.list_resources(@context.merge(resource_types: [ "ec2", "unsupported" ]))
     assert_equal 1, result[:resources].size
-    assert_equal "s3", result[:errors].first[:resource_type]
+    assert_equal "unsupported", result[:errors].first[:resource_type]
     assert_equal "unsupported_resource_type", result[:errors].first[:code]
   end
 
