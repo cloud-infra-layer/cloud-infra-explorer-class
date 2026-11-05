@@ -16,7 +16,7 @@ Our initial MVP focuses on:
 
 **Team sandbox region:** `us-east-2` (US East, Ohio), where the team's AWS test sandbox is set up. The adapter scans the region supplied in `connection_context`; it is not restricted to the sandbox region.
 
-The application uses a Ruby on Rails monolith with PostgreSQL. The initial AWS adapter supports read-only EC2 discovery. Environment and resource models, fictional demo seeds, and a dashboard of stored resources are implemented; wiring live scans into persistence remains pending.
+The application uses a Ruby on Rails monolith with PostgreSQL. The AWS adapter supports read-only EC2 and S3 discovery. Environment and resource models, fictional demo seeds, and a dashboard of stored resources are implemented; wiring live scans into persistence remains pending.
 
 See [AWS development setup](docs/aws-setup.md) for authentication, the discovery role, and the manual verification command.
 
@@ -30,7 +30,7 @@ See [AWS development setup](docs/aws-setup.md) for authentication, the discovery
 | HTML / CSS / JavaScript | Frontend |
 | Git / GitHub | Version control and collaboration |
 | GitHub Actions | Continuous integration |
-| AWS SDK for Ruby | Read-only EC2 resource discovery |
+| AWS SDK for Ruby | Read-only EC2 and S3 resource discovery |
 
 ## Local Development Setup
 
@@ -353,13 +353,13 @@ Open `/` or `/dashboard` on the running Rails server to view stored EC2 and S3 r
 
 The `Course demo` environment uses fictional `us-east-1` resources. It is separate from the team's live `us-east-2` sandbox and demonstrates that stored inventory is not restricted to the sandbox region. Rerunning seeds refreshes the demo records while preserving their database IDs and unrelated inventory. Keep the demo environment's name, provider, and region stable; changing them can create another demo environment. Manual edits to seeded resource attributes are overwritten on the next seed run.
 
-The dashboard currently reads stored records only. Running the adapter or `script/verify_ec2.rb` returns discovery results without saving them to the database.
+The dashboard currently reads stored records only. Running the adapter or `script/verify_resources.rb` returns discovery results without saving them to the database.
 
 ## Development Status
 
 The initial Rails application, PostgreSQL configuration, repository, and continuous integration workflow are established.
 
-The EC2 adapter, mocked discovery tests, manual verification script, environment and resource models, demo seeds, and stored-resource dashboard are implemented. S3 discovery, scan coordination, and persistence of live scan results remain planned for upcoming development iterations.
+The EC2/S3 adapter, mocked discovery tests, manual verification script, environment and resource models, demo seeds, and stored-resource dashboard are implemented. The initial scan coordinator is implemented; scan lifecycle management and persistence of live scan results remain Sprint 2 integration work. S3 discovery requires the additional read-only policy described in `docs/aws-setup.md`.
 
 ## Team
 
