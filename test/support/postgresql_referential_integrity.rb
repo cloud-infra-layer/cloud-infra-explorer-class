@@ -48,6 +48,6 @@ module PostgreSQLFixtureReferentialIntegrity
     end
 end
 
-if Rails.env.test? && ActiveRecord.version == Gem::Version.new("8.1.4")
+if Rails.env.test? && %w[8.1.4 8.1.4.1].include?(ActiveRecord.version.to_s)
   ActiveRecord::ConnectionAdapters::PostgreSQLAdapter.prepend(PostgreSQLFixtureReferentialIntegrity)
 end

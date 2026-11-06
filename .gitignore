@@ -61,3 +61,6 @@ build-iPhoneSimulator/
 
 # Ignore key files for decrypting credentials and more.
 /config/*.key
+
+# Ignore macOS Finder metadata.
+.DS_Store

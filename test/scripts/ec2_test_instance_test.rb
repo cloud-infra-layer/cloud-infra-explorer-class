@@ -77,7 +77,7 @@ class Ec2TestInstanceScriptTest < Minitest::Test
     refute_includes launch, "--key-name"
     refute_includes launch, "--iam-instance-profile"
     assert_equal "cloud-explorer-test-run", launch[launch.index("--client-token") + 1]
-    assert_includes output, "Ready. Run: AWS_PROFILE=cloud-explorer-dev AWS_REGION=us-east-2 bundle exec ruby script/verify_ec2.rb"
+    assert_includes output, "Ready. Run: AWS_PROFILE=cloud-explorer-dev AWS_REGION=us-east-2 bundle exec ruby script/verify_resources.rb --services ec2"
   end
 
   def test_existing_instance_does_not_launch_another

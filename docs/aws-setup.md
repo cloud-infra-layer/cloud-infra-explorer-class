@@ -1,27 +1,26 @@
-# AWS development setup
+# AWS development setup and sandbox testing
 
-Sprint 1 covers issues #5 (connectivity) and #7 (adapter), tracked by #6.
-The team's sandbox uses **us-east-2 (Ohio)**. No S3 permissions or infrastructure
-write permissions are needed by the adapter.
+Use the team sandbox account `821058455060` in `us-east-2` (Ohio). The adapter accepts other regions, but these profiles, policies, and test-resource instructions are specific to our sandbox.
 
-The application adapter is not restricted to this sandbox: it scans the region supplied in `connection_context` using the configured AWS credentials. It does not filter by a test instance's ID, tags, type, or state. The account-specific trust policy, Ohio discovery policy, and disposable-instance helper in this repository are team sandbox configuration, not requirements for other users. Other accounts need their own trusted principal and read-only policy for the regions they intend to scan.
+| Profile | Purpose |
+|---|---|
+| `cloud-explorer-setup` | Browser login and administrator actions, including creating and removing test resources |
+| `cloud-explorer-source` | Supplies temporary login credentials to the Ruby SDK |
+| `cloud-explorer-dev` | Assumes `CloudExplorerDiscovery` for read-only discovery |
 
-## Local prerequisites
+**Already configured?** Start with [Run discovery](#4-run-discovery), [Test a real S3 bucket](#5-test-a-real-s3-bucket), or [Test a real EC2 instance](#6-test-a-real-ec2-instance). Run commands from the repository root. Keep credentials and files under `~/.aws` out of Git and shared logs.
 
-Install the project's Ruby version and dependencies (`bundle install`). Install
-AWS CLI v2 if needed:
+## 1. Install dependencies and sign in
+
+Install the project's Ruby version, then:
 
 ```bash
+bundle install
 brew install awscli
 aws --version
 ```
 
-Browser login requires AWS CLI 2.32.0 or newer. A project owner must invite each
-developer individually. AWS Projects invitations grant broad project access;
-use the restricted role below for discovery. Do not share login credentials or
-commit AWS tokens, access keys, or files under `~/.aws`.
-
-## Browser login
+Browser login requires AWS CLI 2.32.0 or newer and an individual invitation to the team project.
 
 ```bash
 aws login --profile cloud-explorer-setup --region us-east-2
@@ -29,41 +28,11 @@ aws configure set region us-east-2 --profile cloud-explorer-setup
 aws sts get-caller-identity --profile cloud-explorer-setup
 ```
 
-Choose the team's sandbox project in the browser. The expected sandbox account
-is `821058455060`; the setup session uses `AccountFullAccessRole`. Check that the
-account matches before administering any resources. The project have been renamed
-from its initial name, `Ready Set Build`.
+Choose the team project in the browser. Confirm that `Account` is `821058455060` and the ARN uses `AccountFullAccessRole` before administering resources. Repeat browser login when the session expires.
 
-## Read-only role (one-time account setup)
+## 2. Configure local discovery profiles
 
-`CloudExplorerDiscovery` already exists in the team's sandbox. These commands
-document how it was provisioned; developers should skip creation when joining.
-Review the policy files before applying them to another account, particularly
-the account-specific principal in the trust policy.
-
-```bash
-aws iam create-role \
-  --role-name CloudExplorerDiscovery \
-  --assume-role-policy-document file://config/aws/discovery-trust-policy.json \
-  --max-session-duration 3600 \
-  --profile cloud-explorer-setup --region us-east-2
-
-aws iam put-role-policy \
-  --role-name CloudExplorerDiscovery \
-  --policy-name EC2DiscoveryOhio \
-  --policy-document file://config/aws/ec2-discovery-policy.json \
-  --profile cloud-explorer-setup --region us-east-2
-```
-
-The trust policy allows the sandbox's `managed/AccountFullAccessRole` to assume
-this role. Its only resource permission is `ec2:DescribeInstances` in Ohio.
-`Resource: "*"` is necessary because this API does not support individual
-instance ARN restrictions. No changes to the AWS-managed setup role are needed.
-
-## Configure each developer's local profiles
-
-Run these once after browser login. They write configuration, not static access
-keys, to `~/.aws/config`:
+Run once per developer:
 
 ```bash
 aws configure set credential_process \
@@ -79,207 +48,277 @@ aws configure set region us-east-2 --profile cloud-explorer-dev
 aws configure set duration_seconds 3600 --profile cloud-explorer-dev
 ```
 
-The intermediary `credential_process` profile is needed because the pinned Ruby
-SDK supports browser login directly but does not resolve `login_session` as an
-assume-role source profile. The CLI supplies temporary source credentials to the
-SDK without storing permanent keys. Do not run the export-credentials command
-by itself or paste its output into logs or issues.
-
-The profile chain is: browser login → credential process → discovery role.
-Only use `cloud-explorer-dev` for the adapter. This limits ordinary application
-requests; it is not isolation from untrusted code on a laptop that also holds
-the administrator session. A deployed application needs its own workload identity.
-
-Verify the restricted identity:
+The discovery role must exist before this profile can be used. Have an administrator complete step 3 if needed, then verify the profile:
 
 ```bash
 aws sts get-caller-identity --profile cloud-explorer-dev
 ```
 
-The ARN should contain `assumed-role/CloudExplorerDiscovery/`.
+The ARN should contain `assumed-role/CloudExplorerDiscovery/` in account `821058455060`.
 
-## Verify real EC2 discovery
+The credential-process bridge lets the pinned Ruby SDK assume the discovery role using temporary browser-login credentials. These commands save configuration, not permanent access keys. Do not run `export-credentials` separately or share its output. A deployed application needs its own workload identity.
 
-From the repository root:
+## 3. Enable read-only permissions
 
-```bash
-AWS_PROFILE=cloud-explorer-dev AWS_REGION=us-east-2 bundle exec ruby script/verify_ec2.rb
-```
-
-The verification script requires `AWS_REGION` to select the region explicitly. It has no hardcoded sandbox-region fallback; missing or malformed region input returns `invalid_context`. Use a profile authorized for the requested region. The team discovery profile remains restricted to Ohio.
-
-This calls the adapter without starting Rails or requiring PostgreSQL. It prints
-the normalized resource/error contract and exits with status 1 if discovery fails.
-Resources include IDs, names, instance types, states, region, and console URLs.
-Avoid putting secrets in resource names. Review output before sharing it.
-
-An empty `resources` array with an empty `errors` array is a successful scan of
-an empty account. To demonstrate actual metadata, a team administrator can use
-the optional test-instance helper below. The verification script itself never
-creates, starts, stops, or deletes infrastructure.
-
-For Rails console integration:
+**Administrator only.** Check whether the discovery role exists:
 
 ```bash
-AWS_PROFILE=cloud-explorer-dev bin/rails console
+aws iam get-role --role-name CloudExplorerDiscovery \
+  --profile cloud-explorer-setup --region us-east-2
 ```
+
+If the response is `NoSuchEntity`, review the account-specific trust principal in `config/aws/discovery-trust-policy.json` and create the role. For other errors, resolve authentication or permissions before continuing. Skip creation if the role already exists.
+
+```bash
+aws iam create-role \
+  --role-name CloudExplorerDiscovery \
+  --assume-role-policy-document file://config/aws/discovery-trust-policy.json \
+  --max-session-duration 3600 \
+  --profile cloud-explorer-setup --region us-east-2
+```
+
+Apply both policies to the role. Repeating these commands replaces the named inline policies with the repository versions.
+
+```bash
+aws iam put-role-policy \
+  --role-name CloudExplorerDiscovery \
+  --policy-name EC2DiscoveryOhio \
+  --policy-document file://config/aws/ec2-discovery-policy.json \
+  --profile cloud-explorer-setup --region us-east-2
+
+aws iam put-role-policy \
+  --role-name CloudExplorerDiscovery \
+  --policy-name S3DiscoveryOhio \
+  --policy-document file://config/aws/s3-discovery-policy.json \
+  --profile cloud-explorer-setup --region us-east-2
+```
+
+| Policy | Permission | Scope |
+|---|---|---|
+| `EC2DiscoveryOhio` | `ec2:DescribeInstances` | EC2 discovery in Ohio |
+| `S3DiscoveryOhio` | `s3:ListAllMyBuckets` | Bucket-listing requests through the Ohio endpoint |
+
+Both actions require `Resource: "*"`. S3's `aws:RequestedRegion` condition restricts the endpoint, not the bucket locations that the permission can enumerate. The adapter supplies a separate region filter and validates returned regions. The role has no object-reading, object-listing, creation, or deletion permissions; discovery does not require `HeadBucket` or `GetBucketLocation`.
+
+## 4. Run discovery
+
+Discover EC2 instances and S3 general-purpose buckets in Ohio:
+
+```bash
+AWS_PROFILE=cloud-explorer-dev AWS_REGION=us-east-2 bundle exec ruby script/verify_resources.rb
+```
+
+To test a single service:
+
+```bash
+AWS_PROFILE=cloud-explorer-dev AWS_REGION=us-east-2 bundle exec ruby script/verify_resources.rb --services ec2
+AWS_PROFILE=cloud-explorer-dev AWS_REGION=us-east-2 bundle exec ruby script/verify_resources.rb --services s3
+```
+
+The script defaults to both services. Use `--services ec2`, `--services s3`, or `--services ec2,s3` to select services, and `--help` for usage. Unsupported service names or invalid arguments exit with status 2 before discovery.
+
+The script prints JSON and exits with status 1 if any selected service reports an error, or 0 on success. It requires `AWS_REGION`, uses read-only credentials, and neither creates infrastructure nor saves records to PostgreSQL. Rails and a database are not needed.
+
+- `"resources": [], "errors": []` means discovery succeeded but found no resources in the requested region.
+- An error means discovery failed for the named service, even if its resource list is empty. Successful results from the other service remain available.
+- S3 returns owned general-purpose buckets only. Missing bucket names or missing/mismatched regions cause the entire S3 result to fail. Directory buckets and cross-account bucket discovery are outside this implementation.
+
+To call the adapter from Rails, start `AWS_PROFILE=cloud-explorer-dev bin/rails console`, then run:
 
 ```ruby
 CloudProvider::Adapter.new.list_resources(
-  provider: "aws", region: "us-east-2", resource_types: ["ec2"]
+  provider: "aws", region: "us-east-2", resource_types: ["ec2", "s3"]
 )
 ```
 
-The SDK uses its standard credential provider chain. Remove stale
-`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and `AWS_SESSION_TOKEN` environment
-variables if they override the intended profile. Credentials are never supplied
-in `connection_context`.
+## 5. Test a real S3 bucket
 
-## Optional disposable EC2 test instance
+An S3 resource is a **bucket**, rather than an instance. An empty bucket is enough to test discovery; do not upload objects. Use the setup profile for creation and cleanup and the discovery profile for verification.
 
-Use `script/ec2_test_instance.sh` for a manual live check. It calls AWS CLI using
-**cloud-explorer-setup**, not the read-only discovery profile. Keep creation and
-cleanup out of CI. These operations consume credits or incur charges for compute
-and EBS; the script does not promise free usage.
+### Create an empty sandbox bucket
 
-The helper is fixed to account `821058455060` and region `us-east-2`, and checks
-the caller's account before accessing EC2. It creates one Amazon Linux 2023
-`t3.micro`, an encrypted 8 GiB gp3 root volume, and a dedicated security group.
-There is no public IP, inbound or outbound security-group access, SSH key, user
-data, or instance IAM role. IMDSv2 is required and CPU credits use standard mode.
-Discovery only calls AWS APIs; it doesn't need network access into the instance.
-
-First, log in and list existing subnets:
+Use the same terminal for creation and cleanup so `S3_TEST_BUCKET` remains available. First confirm the account:
 
 ```bash
-aws login --profile cloud-explorer-setup --region us-east-2
+aws sts get-caller-identity --profile cloud-explorer-setup
+```
+
+Proceed only if `Account` is `821058455060`. Generate a unique name and save the printed value for cleanup if your terminal closes:
+
+```bash
+S3_TEST_BUCKET="cie-test-821058455060-$(ruby -rsecurerandom -e 'puts SecureRandom.hex(8)')"
+echo "$S3_TEST_BUCKET"
+
+aws s3api create-bucket \
+  --bucket "$S3_TEST_BUCKET" \
+  --create-bucket-configuration LocationConstraint=us-east-2 \
+  --profile cloud-explorer-setup --region us-east-2
+```
+
+Continue only after creation succeeds. A name collision requires a new name; do not treat an existing bucket as one you just created. New buckets block public access by default. Explicitly retain that configuration:
+
+```bash
+aws s3api put-public-access-block \
+  --bucket "${S3_TEST_BUCKET:?Set the test bucket name first}" \
+  --expected-bucket-owner 821058455060 \
+  --public-access-block-configuration BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true \
+  --profile cloud-explorer-setup --region us-east-2
+```
+
+These setup operations require `s3:CreateBucket` and `s3:PutBucketPublicAccessBlock`; cleanup requires `s3:DeleteBucket`. Keep those permissions on the setup identity, not the discovery role. If a command fails after creation, the bucket may still exist. Inspect it and either finish configuring it for reuse or delete it below.
+
+### Verify discovery
+
+```bash
+AWS_PROFILE=cloud-explorer-dev AWS_REGION=us-east-2 bundle exec ruby script/verify_resources.rb
+```
+
+Find the resource whose `resource_id` matches the printed bucket name. Confirm:
+
+| Field | Expected value |
+|---|---|
+| `provider` | `aws` |
+| `service` | `s3` |
+| `resource_id`, `name` | Your `S3_TEST_BUCKET` value |
+| `region` | `us-east-2` |
+| `metadata` | `{}` |
+| `console_url` | An S3 console link containing your bucket name and `region=us-east-2` |
+| Top-level `errors` | `[]` for a fully successful EC2 and S3 scan |
+
+Other existing resources may also appear. No EC2 instance is required: successful empty EC2 discovery is valid.
+
+### Keep the bucket for repeated tests
+
+You can keep the empty, private bucket for development and demos. S3 has no stopped state: the bucket remains discoverable until deleted. Leave public access blocked and avoid uploading objects unless a test requires them. S3 charges depend on storage, requests, and other enabled features, so retaining an empty bucket does not mean all operations are free.
+
+Save its name, account, region, and responsible team member in your team's resource inventory. To reuse it in a new terminal, restore its name and run discovery without repeating creation:
+
+```bash
+S3_TEST_BUCKET="REPLACE_WITH_SAVED_BUCKET_NAME"
+AWS_PROFILE=cloud-explorer-dev AWS_REGION=us-east-2 bundle exec ruby script/verify_resources.rb
+```
+
+### Delete the bucket when no longer needed
+
+If you are not keeping the bucket for reuse, delete it after testing, including after failed verification. For a shared bucket, confirm the team has finished using it. If you reopened the terminal, set `S3_TEST_BUCKET` to the exact saved name first.
+
+```bash
+aws s3api delete-bucket \
+  --bucket "${S3_TEST_BUCKET:?Set the test bucket name first}" \
+  --expected-bucket-owner 821058455060 \
+  --profile cloud-explorer-setup --region us-east-2
+```
+
+A successful deletion returns no output and exit status 0. `BucketNotEmpty` means someone added data; inspect it before proceeding. Do not use recursive or forced deletion. This workflow intentionally creates an empty bucket.
+
+Rerun discovery and confirm the test bucket is absent with no S3 error.
+
+## 6. Test a real EC2 instance
+
+The helper creates one `t3.micro` in the sandbox. Cleanup is a separate command, not automatic. You can retain the instance for repeated tests and stop it between sessions. Compute and EBS usage consume credits or incur charges. Run this manually, never in CI.
+
+### Create and verify an instance
+
+List existing subnets and choose an available sandbox subnet:
+
+```bash
 aws ec2 describe-subnets \
   --profile cloud-explorer-setup --region us-east-2 \
   --query 'Subnets[].{Subnet:SubnetId,VPC:VpcId,AZ:AvailabilityZone,State:State}' \
   --output table
 ```
 
-Choose an available sandbox subnet. The helper does not create a VPC, subnet,
-gateway, or other shared networking. If there is no subnet, coordinate with the
-team before creating networking. The setup identity also needs SSM GetParameter
-for the public Amazon Linux AMI parameter and EC2 permissions to describe images
-and subnets, create/tag an instance and security group, remove egress rules,
-terminate the instance, and delete the group. Do not add these permissions to
-`CloudExplorerDiscovery`.
-
-Choose a unique run ID (for example, your username plus a timestamp). Use the
-same ID for cleanup, and never reuse it for a new run or copy its tags onto
-unrelated resources. Replace the example subnet ID with your chosen subnet:
+Replace `subnet-REPLACE_ME`, then create and verify:
 
 ```bash
-TEST_RUN="gm3239-$(date -u +%Y%m%d%H%M%S)"
+TEST_RUN="ec2-$(date -u +%Y%m%d%H%M%S)"
 bash script/ec2_test_instance.sh create "$TEST_RUN" subnet-REPLACE_ME
 
-AWS_PROFILE=cloud-explorer-dev AWS_REGION=us-east-2 bundle exec ruby script/verify_ec2.rb
-
-bash script/ec2_test_instance.sh cleanup "$TEST_RUN"
+AWS_PROFILE=cloud-explorer-dev AWS_REGION=us-east-2 bundle exec ruby script/verify_resources.rb --services ec2
 ```
 
-The create command prints its instance ID and cleanup command before waiting
-for the running state. Check that the adapter reports that ID, the name
-`cloud-explorer-test-<run-id>`, `t3.micro`, `running`, and `us-east-2`. Save reviewed
-verification evidence in the PR. If EC2's eventually consistent API hasn't
-returned the instance yet, retry discovery shortly afterward.
+Confirm the printed instance ID appears with name `cloud-explorer-test-<run-id>`, type `t3.micro`, state `running`, region `us-east-2`, and no errors. EC2 is eventually consistent; retry shortly afterward if a newly created instance is not yet listed.
 
-**Run cleanup even if verification fails or the shell is interrupted.** This
-helper does not schedule automatic cleanup. It finds resources by both
-`ManagedBy=cloud-explorer-live-test` and `TestRun=<run-id>` tags, so no local state
-file is required. It refuses multiple matching instances or security groups.
-Cleanup terminates the matching instance, waits for termination, and deletes
-the matching group (retrying temporary dependency errors). The launch config
-sets the root volume and network interface to delete on termination. It never
-deletes the existing VPC or subnet.
+### Keep, stop, and restart the instance
 
-If creation fails after creating a group, run cleanup with the printed run ID.
-If cleanup fails, rerun it and inspect the tagged resources in the console;
-do not assume a failed command removed everything. Stopping the instance is not
-a substitute for cleanup because its storage remains. Repeating cleanup when
-no matching resources remain is safe. Repeating create while its tagged
-instance is still visible returns that instance instead of launching another;
-each new test must use a fresh run ID.
+Save the helper's run ID and instance ID, account, region, and responsible team member in your team's resource inventory. Keep the helper's `ManagedBy` and `TestRun` tags so cleanup can find the resources later. Reuse the existing instance instead of creating another for each test.
 
-The helper is tested with a fake AWS CLI; these tests do not create resources:
+Set the instance ID to the value printed by the helper or returned by discovery. Stop it when you do not need it running:
 
 ```bash
-bundle exec ruby test/scripts/ec2_test_instance_test.rb
+EC2_TEST_INSTANCE_ID="i-REPLACE_ME"
+
+aws ec2 stop-instances \
+  --instance-ids "${EC2_TEST_INSTANCE_ID:?Set the test instance ID first}" \
+  --profile cloud-explorer-setup --region us-east-2
+aws ec2 wait instance-stopped \
+  --instance-ids "${EC2_TEST_INSTANCE_ID:?Set the test instance ID first}" \
+  --profile cloud-explorer-setup --region us-east-2
 ```
 
-The helper has also been exercised against a live instance. See the discovery
-and cleanup results in the verification evidence below.
+A stopped instance remains discoverable with state `stopped`, so it is sufficient for inventory testing. Stopping ends instance compute charges, but retained EBS storage still incurs charges. The instance and its storage are not deleted.
 
-## Tests and troubleshooting
+When a test or demo needs state `running`, restore `EC2_TEST_INSTANCE_ID` if necessary, then start the same instance:
 
-Credential-free unit tests (no network or database needed):
+```bash
+aws ec2 start-instances \
+  --instance-ids "${EC2_TEST_INSTANCE_ID:?Set the test instance ID first}" \
+  --profile cloud-explorer-setup --region us-east-2
+aws ec2 wait instance-running \
+  --instance-ids "${EC2_TEST_INSTANCE_ID:?Set the test instance ID first}" \
+  --profile cloud-explorer-setup --region us-east-2
+
+AWS_PROFILE=cloud-explorer-dev AWS_REGION=us-east-2 bundle exec ruby script/verify_resources.rb --services ec2
+```
+
+Stop/start operations require `ec2:StopInstances` and `ec2:StartInstances`; the wait commands require `ec2:DescribeInstances`. Use the setup identity, not the read-only discovery role.
+
+### Delete the instance when no longer needed
+
+If you are not keeping the instance for reuse, clean it up after testing, including after failed verification. For a shared instance, confirm the team has finished using it. If you reopened the terminal, restore `TEST_RUN` to the original run ID, not a new timestamp. Cleanup works for running or stopped instances and permanently terminates them:
+
+```bash
+bash script/ec2_test_instance.sh cleanup "${TEST_RUN:?Set the original test run ID first}"
+```
+
+The helper checks the account, uses exact test-run tags, and refuses ambiguous matches. It creates an encrypted 8 GiB root volume and an isolated security group, with no public IP, SSH key, instance role, or inbound/outbound rules. It requires IMDSv2. The setup identity needs SSM access to the public AMI parameter and EC2 permissions for the helper's describe, create, tag, and delete operations.
+
+Cleanup waits for termination and removes the test security group. The root volume and network interface are configured for deletion on termination. Existing VPCs and subnets are preserved. If no subnet exists, coordinate with the team before creating shared networking.
+
+There is no scheduled cleanup. Agree on who will remove retained resources when testing or the project ends. Rerun cleanup if it fails and inspect remaining tagged resources. Use a fresh run ID only when creating a new instance.
+
+## 7. Automated tests and troubleshooting
+
+These tests use mocked AWS responses and a fake CLI; they do not access AWS or require PostgreSQL:
 
 ```bash
 bundle exec ruby test/services/cloud_provider/adapter_test.rb
+bundle exec ruby test/services/cloud_provider/s3_adapter_test.rb
+bundle exec ruby test/scripts/ec2_test_instance_test.rb
+bundle exec ruby test/scripts/verify_resources_test.rb
 ```
 
-The same tests are included in `bin/rails test` and GitHub CI; do not add AWS
-secrets to CI. Tests cover mapping, pagination, empty inventories, later-page
-failures, authentication, authorization, networking, and unsupported services.
+They also run with `bin/rails test` and in CI. Never add live AWS credentials to CI for these tests.
 
-- **Expired session:** rerun `aws login --profile cloud-explorer-setup --region us-east-2`.
-- **Credentials unavailable:** confirm all three profiles above exist and that
-  `aws` is on PATH. Restart a long-running Rails process after refreshing login.
-- **AWS API error:** check the role identity, its policy, and the region. The
-  adapter intentionally avoids returning raw SDK exception messages.
-- **Network error:** check connectivity and retry; existing inventory must be preserved.
-- **Empty inventory:** confirm the test instance belongs to this account and region.
-
-## Verification evidence
-
-On October 27, 2026, the Ruby verification script successfully called EC2 through
-`CloudExplorerDiscovery` in account `821058455060`, region `us-east-2`, returning
-`{"resources":[],"errors":[]}`. This initial check verified discovery of an empty
-inventory.
-
-The developer subsequently reported a successful live test using run ID `gm3239-20261028025258` (the run ID uses UTC). The following command returned one normalized resource and no errors. This historical run predates the explicit `AWS_REGION` requirement; use the current commands above for new verification runs:
-
-```bash
-AWS_PROFILE=cloud-explorer-dev bundle exec ruby script/verify_ec2.rb
-```
-
-| Field | Observed value |
+| Symptom | What to check |
 |---|---|
-| Provider | `aws` |
-| Resource ID | `i-0d4e52323d532b770` |
-| Service | `ec2` |
-| Name | `cloud-explorer-test-gm3239-20261028025258` |
-| Region | `us-east-2` |
-| Instance type | `t3.micro` |
-| State | `running` |
-| Console URL | `https://us-east-2.console.aws.amazon.com/ec2/home?region=us-east-2#InstanceDetails:instanceId=i-0d4e52323d532b770` |
-| Errors | `[]` |
-
-The developer then ran:
-
-```bash
-bash script/ec2_test_instance.sh cleanup gm3239-20261028025258
-```
-
-AWS accepted termination of `i-0d4e52323d532b770`, reporting a transition from
-`running` to `shutting-down`. The helper subsequently reported cleanup completed;
-its completion path waits for instance termination and removes the tagged test
-security group. The root volume was configured with `DeleteOnTermination=true`;
-the supplied output does not independently verify volume deletion. No test
-instance needs to remain running for the mocked tests.
-
-IAM policy simulation allowed `ec2:DescribeInstances` in Ohio and denied
-`ec2:RunInstances` and `ec2:TerminateInstances`. A simulation of the deployed role
-also denied discovery in `eu-west-1`. The Ruby SDK's STS identity check confirmed
-that it uses `assumed-role/CloudExplorerDiscovery/`.
+| Expired login | Repeat the browser login in step 1; restart a long-running Rails process afterward. |
+| `credentials_unavailable` | Confirm all three profiles exist and `aws` is on PATH. Remove stale `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and `AWS_SESSION_TOKEN` variables if they override the profile. |
+| `invalid_context` | Supply `AWS_REGION=us-east-2` when running a verification script. |
+| S3 `aws_api_error` | Confirm the administrator applied `S3DiscoveryOhio`; allow IAM changes time to propagate. |
+| Other `aws_api_error` | Check the role identity, requested region, and IAM or organization restrictions. |
+| `invalid_resource` | AWS returned missing identity or inconsistent region data. Retry; do not treat it as an empty inventory. |
+| `network_error` | Check connectivity and retry. |
+| Test resource missing | Confirm its account and region, and check `errors` before interpreting an empty result. |
+| Cleanup fails | Retain the bucket name or EC2 run ID and inspect the exact test resource. Do not assume it was removed. |
 
 ## References
 
-- [AWS CLI browser login and credential-process compatibility](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sign-in.html)
+- [AWS CLI browser login](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sign-in.html)
 - [Ruby SDK authentication](https://docs.aws.amazon.com/sdk-for-ruby/v3/developer-guide/credentials.html)
-- [EC2 action and region restrictions](https://docs.aws.amazon.com/service-authorization/latest/reference/list_ec2.html)
-- [Assume-role profiles](https://docs.aws.amazon.com/sdkref/latest/guide/feature-assume-role-credentials.html)
-- [EC2 CLI launch options](https://docs.aws.amazon.com/cli/latest/reference/ec2/run-instances.html)
-- [Amazon Linux 2023 AMI parameters](https://docs.aws.amazon.com/linux/al2023/ug/ec2.html)
+- [S3 ListBuckets and region filtering](https://docs.aws.amazon.com/AmazonS3/latest/API/API_ListBuckets.html)
+- [Create an S3 bucket](https://docs.aws.amazon.com/cli/latest/reference/s3api/create-bucket.html)
+- [Delete an empty S3 bucket](https://docs.aws.amazon.com/cli/latest/reference/s3api/delete-bucket.html)
+- [Stop and start EC2 instances](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/Stop_Start.html)
+- [S3 pricing](https://aws.amazon.com/s3/pricing/)
+- [EC2 discovery permissions](https://docs.aws.amazon.com/service-authorization/latest/reference/list_amazonec2.html)

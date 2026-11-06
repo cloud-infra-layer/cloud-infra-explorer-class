@@ -70,7 +70,7 @@ connection_context contains:
 - region: "us-east-2"
 - resource_types: ["ec2", "s3"]
 
-For Sprint 1, request `["ec2"]`. S3 remains part of the planned MVP but is not yet implemented.
+Request `["ec2"]`, `["s3"]`, or `["ec2", "s3"]`. Both services require the selected environment's explicit region.
 The adapter accepts symbol or string hash keys; values use the strings shown above.
 The region must be an AWS region code supplied by the selected environment, such as `us-east-2` or `eu-west-1`. The adapter passes it to the SDK and includes it in returned resources. Region format validation does not establish service availability or account access; AWS permissions and region availability determine whether discovery succeeds. Scans do not enumerate other regions automatically.
 
@@ -99,7 +99,7 @@ Each error includes:
 4. Errors must not be interpreted as an empty inventory.
 5. Failed scans must preserve previously stored resources.
 
-### Sprint 1 behavior
+### Adapter behavior
 
 - `CloudProvider::Adapter` is implemented in `app/services/cloud_provider/adapter.rb`.
 - EC2 discovery reads all response pages and reservations. It uses the `Name` tag,
@@ -109,15 +109,9 @@ Each error includes:
 - Metadata includes only `instance_type` and `state`; arbitrary tags and raw AWS
   responses are not copied into metadata.
 - A successful empty discovery returns `{ resources: [], errors: [] }`.
-- If any EC2 page fails, all EC2 results from that call are discarded and a safe
-  structured error is returned. An error is not proof that resources disappeared.
-- Unsupported types produce `unsupported_resource_type`. If both EC2 and S3 are
-  requested, successful EC2 results can accompany an S3 error. The backend must
-  not treat the overall scan as a complete successful inventory or delete missing
-  resources based on it.
-- Expected failures use `credentials_unavailable`, `aws_api_error`, or
-  `network_error`, with `resource_type: "ec2"`. Raw exception messages are not
-  returned. Invalid input uses `invalid_context` and `resource_type: "connection"`.
+- If any page fails, all results for that service are discarded and a safe structured error is returned. An error is not proof that resources disappeared.
+- Unsupported types produce `unsupported_resource_type`. Successful results from either service are preserved when the other service fails. The backend must not treat the overall scan as a complete successful inventory or delete missing resources based on it.
+- Expected failures use `credentials_unavailable`, `aws_api_error`, `network_error`, or `invalid_resource`, with the affected service as `resource_type`. Raw exception messages are not returned. Invalid input uses `invalid_context` and `resource_type: "connection"`.
 - This adapter performs no database writes and does not implement scan status,
   reconciliation, or historical snapshots.
 
@@ -274,7 +268,15 @@ Each error must contain:
 - code
 - message
 
-For Sprint 2, EC2 and S3 discovery should be supported.
+EC2 and S3 discovery are supported. Each request requires one explicit region, including S3-only requests. Missing or malformed regions fail before any AWS client is created. There is no implicit account-wide scan or fallback to the sandbox region.
+
+EC2 calls the selected region's `DescribeInstances` endpoint with pagination. S3 calls paginated `ListBuckets` using `bucket_region` equal to the selected region and a matching regional client. S3 returns account-owned general-purpose buckets only; directory buckets and buckets owned by another account are out of scope.
+
+S3 resource mapping uses the bucket name for both `resource_id` and `name`, `BucketRegion` for `region`, and an empty metadata hash. No object contents, tags, or raw SDK responses are retrieved. The list response provides the region; no `HeadBucket` or `GetBucketLocation` calls are made. Console links are included for recognized commercial AWS regions and otherwise remain null.
+
+Both services require a nonblank resource identifier. S3 also requires a returned region matching the requested region. Missing or inconsistent required fields produce `invalid_resource`; the adapter does not guess a region, silently skip records, or return a bucket with `region: nil`. Optional fields do not cause service failure.
+
+Discovery is all-or-nothing within each service: a failed page or invalid required field discards that service's results. The other service is still attempted, and its successful results are retained, including valid empty results. An error identifies the failed service so the coordinator can distinguish partial from failed scans. SDK retries are bounded, and neither service performs database writes or deletion.
 
 Successful discovery of zero resources is valid.
 
