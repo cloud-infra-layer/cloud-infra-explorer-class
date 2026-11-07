@@ -324,6 +324,59 @@ Deleting resources absent from a scan is out of scope.
 A failed database write must report an error rather than silently
 claiming synchronization succeeded.
 
+### ResourceSync implementation interface (Issue #32)
+
+- Pass an existing, persisted `Environment` and an array of normalized hashes.
+  String or symbol keys are accepted, but conflicting copies of the same key
+  are rejected. Input hashes are not modified.
+- Required fields are nonblank string `provider`, `resource_id`, `service`, and
+  `name`, plus hash `metadata`. `region` and `console_url` may be absent or null;
+  a present value must be a nonblank string. Missing optional fields clear old
+  stored values. Nullable regions remain supported by persistence even when
+  the current adapter provides an explicit region.
+- Only the seven normalized resource fields are accepted. Incoming database IDs,
+  environment IDs, timestamps, and unknown fields are rejected. The constructor's
+  environment controls every association and lookup; provider must match it.
+- Metadata is restricted to the current discovery contract: EC2 may contain
+  `instance_type` and `state` with string or null values; S3 accepts `{}`.
+  Unknown metadata keys are rejected rather than silently stored. Demo seed
+  metadata is separate and does not pass through this live-discovery service.
+  Future adapter metadata additions require updating this allowlist together.
+  Callers must still avoid secrets in otherwise allowed strings.
+- `created` counts newly inserted rows. `updated` counts existing rows whose
+  stored attributes actually changed. Unchanged rows are not saved or counted;
+  an unchanged repeat returns `{ created: 0, updated: 0 }`.
+- Duplicate identities within one batch are rejected, even if their attributes
+  match. No implicit last-record-wins rule is applied.
+- Each call locks the selected environment row and saves its resources in one
+  transaction/savepoint. Calls through ResourceSync for the same environment
+  serialize; existing unique indexes also protect identities. Discovery happens
+  before this lock, in the coordinator. The caller should pass a clean Environment
+  object with no unsaved attribute changes.
+- Any failed write rolls back the entire batch, including earlier inserts and
+  updates. Failures raise `ResourceSync::Error`, exposing a safe `code` and
+  `message`, instead of returning success counts. Codes are `invalid_environment`,
+  `invalid_resources`, `invalid_resource`, `duplicate_resource`, or
+  `persistence_failed`. Never serialize the exception's cause or raw database text.
+- Empty input returns zero counts and deletes nothing. Failed discovery is handled
+  by the coordinator, which passes only successful service results into this
+  service. ResourceSync neither creates Scan records nor decides scan status.
+
+Coordinator error handling example:
+
+```ruby
+begin
+  counts = ResourceSync.new(environment: environment).call(resources: successful_resources)
+rescue ResourceSync::Error => error
+  safe_error = { resource_type: "persistence", code: error.code, message: error.message }
+  # Record safe_error in scan.error_details and finish with a failure status.
+  # No writes from this failed batch remain; do not report success counts.
+end
+```
+
+**PR discussion with Brayden:** review the changed-only count semantics, error
+codes, all-or-nothing batch behavior, and metadata allowlist before integration.
+
 ## 5.4 Scan Model
 
 New model: Scan
@@ -337,7 +390,7 @@ Required fields:
 - discovered_count
 - created_count
 - updated_count
-- errors (JSON array)
+- error_details (JSON array; stored scan errors)
 - started_at
 - completed_at
 
@@ -363,6 +416,37 @@ failed:
 Discovery or persistence failed without a fully successful result.
 
 The Scan record must preserve safe error information.
+
+Implementation interface for coordinator review (Issue #32):
+
+- Stored errors use `error_details`, not `errors`, because `scan.errors` is the
+  Rails validation-error interface. The adapter still returns `errors`; the
+  coordinator assigns those safe entries to `scan.error_details`.
+- Each error entry contains exactly `resource_type`, `code`, and `message`, all
+  nonblank strings. Error types may identify a service, connection, or persistence
+  failure. Shape validation cannot determine whether a message contains secrets:
+  callers must supply sanitized messages, never raw exception text.
+- `status` defaults to `running`. The coordinator explicitly supplies `started_at`
+  and a nonempty array of unique `ec2`/`s3` strings in `resource_types`.
+- Counts default to zero and must be nonnegative integers. `error_details`
+  defaults to an empty array.
+- `completed_at` is null while running and required for `completed`, `partial`,
+  and `failed`. It cannot precede `started_at`.
+- The coordinator sets the status, counts, and completion time together; the
+  model does not initiate discovery or automatically transition statuses.
+- Environments with scan history cannot be destroyed through the model; the
+  foreign key also prevents deleting their parent directly in PostgreSQL.
+
+Example creation and successful completion:
+
+```ruby
+scan = environment.scans.create!(resource_types: ["ec2", "s3"], started_at: Time.current)
+scan.update!(status: "completed", completed_at: Time.current,
+  discovered_count: 3, created_count: 2, updated_count: 1, error_details: [])
+```
+
+**PR discussion with Brayden:** confirm the `error_details` field name and these
+timing/validation rules before integrating the coordinator.
 
 Never save credentials or raw AWS exception messages.
 

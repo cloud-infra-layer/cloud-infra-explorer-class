@@ -1,6 +1,17 @@
 require "test_helper"
 
 class EnvironmentTest < ActiveSupport::TestCase
+  test "cannot destroy an environment with scan history even without resources" do
+    environment = environments(:course_testing)
+    environment.scans.create!(resource_types: [ "ec2" ], started_at: Time.current)
+
+    assert_no_difference [ "Environment.count", "Scan.count" ] do
+      assert_not environment.destroy
+    end
+
+    assert environment.errors[:base].any?
+  end
+
   test "cannot destroy an environment that contains resources" do
     environment = environments(:course_development)
 
