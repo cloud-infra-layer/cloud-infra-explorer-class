@@ -30,7 +30,7 @@ class ScanCoordinator
       resources, errors = validate_result(result, resource_types)
 
       failed_types = errors.map { |error| error.fetch("resource_type") }
-      successful_types = resource_types - failed_types
+      successful_types = failed_types.include?("connection") ? [] : resource_types - failed_types
       successful_resources = resources.select { |resource| successful_types.include?(resource_service(resource)) }
 
       # Discovery errors never erase stored inventory, and failed services
