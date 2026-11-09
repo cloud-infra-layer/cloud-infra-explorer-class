@@ -1,5 +1,4 @@
 require "test_helper"
-require "minitest/mock"
 require "base64"
 
 class ScansControllerTest < ActionDispatch::IntegrationTest
@@ -51,8 +50,12 @@ class ScansControllerTest < ActionDispatch::IntegrationTest
       Struct.new(:status, :created_count, :updated_count).new("completed", 2, 1)
     end
 
-    ScanCoordinator.stub(:new, fake) do
+    original_constructor = ScanCoordinator.method(:new)
+    begin
+      ScanCoordinator.define_singleton_method(:new) { |**_kwargs| fake }
       post environment_scans_path(@environment), headers: auth_headers
+    ensure
+      ScanCoordinator.define_singleton_method(:new, original_constructor)
     end
     assert_redirected_to dashboard_path
     assert_match "2 new, 1 updated", flash[:notice]
