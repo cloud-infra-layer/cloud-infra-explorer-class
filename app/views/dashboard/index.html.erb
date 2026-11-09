@@ -4,7 +4,7 @@
 <header>
   <h1>Cloud Infrastructure Explorer</h1>
   <p class="page-description">
-    Stored AWS resources across all environments. This page does not perform a live AWS scan.
+    Stored AWS resources across all environments. Scans run only when explicitly requested by an authorized administrator.
   </p>
 
   <nav aria-label="Resource categories">
@@ -12,6 +12,28 @@
     <%= link_to "S3 buckets", "#s3-resources" %>
   </nav>
 </header>
+
+<% if flash[:notice].present? %>
+  <p role="status"><%= flash[:notice] %></p>
+<% end %>
+<% if flash[:alert].present? %>
+  <p role="alert"><%= flash[:alert] %></p>
+<% end %>
+
+<% if @scan_enabled %>
+  <section aria-labelledby="scan-heading">
+    <h2 id="scan-heading">Manual AWS discovery</h2>
+    <p>Scanning uses the application's configured read-only AWS credentials.</p>
+    <% @environments.each do |environment| %>
+      <%= form_with url: environment_scans_path(environment), method: :post do %>
+        <p><%= environment.name %> (<%= environment.region %>)</p>
+        <%= hidden_field_tag "resource_types[]", "ec2" %>
+        <%= hidden_field_tag "resource_types[]", "s3" %>
+        <%= submit_tag "Scan EC2 and S3" %>
+      <% end %>
+    <% end %>
+  </section>
+<% end %>
 
 <div class="category-grid">
   <%= render "home/category_card",
