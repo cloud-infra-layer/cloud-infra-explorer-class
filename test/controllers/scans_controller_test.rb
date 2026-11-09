@@ -1,4 +1,5 @@
 require "test_helper"
+require "minitest/mock"
 require "base64"
 
 class ScansControllerTest < ActionDispatch::IntegrationTest
