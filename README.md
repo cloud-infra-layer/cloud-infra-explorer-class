@@ -179,6 +179,10 @@ Before submitting changes, run:
 bin/rails test
 ```
 
+Parallel RSpec examples are available in `spec/`, while the original Minitest
+tests remain in `test/`. See [RSpec setup and coverage](spec/README.md) for local
+commands and the mapping between both suites. RSpec is not yet run by CI.
+
 For system tests:
 
 ```bash
