@@ -4,6 +4,15 @@ Cloud Infrastructure Explorer is a web application designed to make AWS infrastr
 
 The project is being developed by a four-person team for Columbia University's COMS W4152: Engineering Software-as-a-Service.
 
+## Deployment & Evaluation
+
+- **Live SaaS Deployment (Heroku):** https://cloud-infra-explorer-class-8dbdbc772bf8.herokuapp.com/
+- **GitHub Repository:** https://github.com/cloud-infra-layer/cloud-infra-explorer-class
+
+> **Note for Teaching Staff / Graders:**
+> Evaluating and testing this product does **NOT** require an AWS account or AWS credentials. 
+> The application includes pre-seeded demo resources in PostgreSQL (`Course demo` environment), and all automated test suites (Minitest, RSpec, Cucumber) use synthetic test databases and mocked AWS SDK responses.
+
 ## Project Overview
 
 Our initial MVP focuses on:
@@ -173,29 +182,44 @@ Stop the server by pressing `Ctrl+C`.
 
 ### 7. Run tests
 
-Before submitting changes, run:
+All test suites execute locally without requiring an AWS account or live AWS credentials:
+
+**1. RSpec Suite (Behavior & Concurrency Specs)**:
+
+```bash
+bundle exec rspec
+```
+
+See [RSpec setup and coverage](spec/README.md) for local commands and test mapping.
+
+**2. Minitest Suite (Unit, Model, Controller & Service Tests)**:
 
 ```bash
 bin/rails test
 ```
 
-Parallel RSpec examples are available in `spec/`, while the original Minitest
-tests remain in `test/`. See [RSpec setup and coverage](spec/README.md) for local
-commands and the mapping between both suites. RSpec is not yet run by CI.
+**3. Cucumber User Stories (Acceptance & Feature BDD)**:
 
-For system tests:
+```bash
+bundle exec cucumber
+```
+*(6 acceptance scenarios covering dashboard viewing, service categorization, and empty-state handling across `features/dashboard.feature` and `features/resource_browsing.feature`)*
+
+**4. System Tests (Browser / UI workflows)**:
 
 ```bash
 bin/rails test:system
 ```
 
-Run the complete Rails CI checks locally with:
+**5. Full CI Checks (Linting & Security Analysis)**:
+
+Run the complete local CI suite (RuboCop, Brakeman, bundler-audit, and tests):
 
 ```bash
 bin/ci
 ```
 
-GitHub Actions also runs automated checks on the repository.
+GitHub Actions also runs automated checks on every push and pull request.
 
 ## Git Workflow
 
@@ -367,7 +391,14 @@ The EC2/S3 adapter, mocked discovery tests, manual verification script, environm
 
 ## Team
 
-Developed by a four-person Columbia University software engineering team.
+Developed by a four-person Columbia University team for **COMS W4152: Engineering Software-as-a-Service** (Fall 2026):
+
+| Member Name | Columbia UNI | Project Responsibility / Role | GitHub Handle |
+|---|---|---|---|
+| **Geonsik Moon** | `gm3239` | Cloud Integration & AWS Discovery | [@gsmoon97](https://github.com/gsmoon97) |
+| **Ian Choi** | `ic2561` | Frontend & Product Development | [@IanJChoi](https://github.com/IanJChoi) |
+| **Samuel Lee** | `sl5806` | Application & Data Architecture | [@slee4456](https://github.com/slee4456) |
+| **Brayden Adcox** | `ba2851` | Technical Lead & Integration Engineering | [@braydenadcox](https://github.com/braydenadcox) |
 
 Repository: https://github.com/cloud-infra-layer/cloud-infra-explorer-class
 
