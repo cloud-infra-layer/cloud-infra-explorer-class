@@ -110,6 +110,45 @@ class ScanCoordinatorTest < ActiveSupport::TestCase
 
   private
 
+    test "persistence failure records a failed scan and preserves inventory" do
+    existing = @environment.resources.create!(ec2_record)
+
+    failing_sync = ->(_environment) {
+      Object.new.tap do |sync|
+        sync.define_singleton_method(:call) do |resources:|
+          raise ResourceSync::Error.new(
+            "persistence_failed",
+            "Resource synchronization failed."
+          )
+        end
+      end
+    }
+
+    adapter = FakeAdapter.new(
+      resources: [ s3_record ],
+      errors: []
+    )
+
+    assert_no_difference "Resource.count" do
+      scan = ScanCoordinator.new(
+        environment: @environment,
+        adapter: adapter,
+        sync_factory: failing_sync
+      ).call
+
+      assert_equal "failed", scan.status
+      assert_equal 0, scan.discovered_count
+      assert_equal 0, scan.created_count
+      assert_equal 0, scan.updated_count
+      assert_equal "persistence_failed",
+        scan.error_details.first.fetch("code")
+      assert_not_nil scan.completed_at
+    end
+
+    assert existing.reload.persisted?
+  end
+
+
   def ec2_record
     { provider: "aws", resource_id: "i-scan-integration", service: "ec2",
       name: "Test EC2", region: @environment.region,
