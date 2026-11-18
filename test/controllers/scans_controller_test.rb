@@ -70,6 +70,35 @@ class ScansControllerTest < ActionDispatch::IntegrationTest
     assert_select "form[action*='/scans']", minimum: 1
   end
 
+
+  test "dashboard shows latest persisted scan status and safe error messages for the selected environment" do
+    enable_scans
+    older = @environment.scans.create!(resource_types: %w[ec2], started_at: 2.hours.ago)
+    older.update!(status: "completed", completed_at: 1.hour.ago,
+      discovered_count: 1, created_count: 1, updated_count: 0)
+
+    newest = @environment.scans.create!(resource_types: %w[ec2 s3], started_at: 30.minutes.ago)
+    newest.update!(status: "partial", completed_at: 20.minutes.ago,
+      discovered_count: 2, created_count: 0, updated_count: 1,
+      error_details: [ { "resource_type" => "s3", "code" => "aws_api_error",
+        "message" => "S3 discovery unavailable." } ])
+
+    get dashboard_path
+    assert_response :success
+    assert_select "p[role=status]", text: /Latest scan: partial \(2 discovered, 0 created, 1 updated\)/
+    assert_select "li", text: /s3: S3 discovery unavailable\./
+    assert_select "p[role=status]", text: /Latest scan: completed/, count: 0
+  end
+
+  test "dashboard does not expose scan history when manual scans are disabled" do
+    @environment.scans.create!(resource_types: %w[ec2], started_at: Time.current)
+    ENV.delete("ENABLE_MANUAL_SCANS")
+    get dashboard_path
+    assert_response :success
+    assert_select "form[action*='/scans']", count: 0
+    assert_select "p[role=status]", text: /Latest scan:/, count: 0
+  end
+
   private
 
   def enable_scans
