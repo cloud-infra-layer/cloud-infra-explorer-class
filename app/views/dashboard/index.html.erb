@@ -27,6 +27,18 @@
     <% @environments.each do |environment| %>
       <%= form_with url: environment_scans_path(environment), method: :post do %>
         <p><%= environment.name %> (<%= environment.region %>)</p>
+        <% if (scan = @latest_scans[environment.id]) %>
+          <p role="status">Latest scan: <%= scan.status %> (<%= scan.discovered_count %> discovered, <%= scan.created_count %> created, <%= scan.updated_count %> updated).</p>
+          <% if scan.error_details.any? %>
+            <ul aria-label="Scan errors">
+              <% scan.error_details.each do |error| %>
+                <li><%= error.fetch("resource_type") %>: <%= error.fetch("message") %></li>
+              <% end %>
+            </ul>
+          <% end %>
+        <% else %>
+          <p>No scans recorded for this environment.</p>
+        <% end %>
         <%= hidden_field_tag "resource_types[]", "ec2" %>
         <%= hidden_field_tag "resource_types[]", "s3" %>
         <%= submit_tag "Scan EC2 and S3" %>
