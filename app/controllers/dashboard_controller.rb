@@ -12,6 +12,13 @@ class DashboardController < ApplicationController
     @resource_counts = @resources_by_service.transform_values(&:size)
     @scan_enabled = ENV["ENABLE_MANUAL_SCANS"] == "true" &&
       ENV["SCAN_ADMIN_USERNAME"].present? && ENV["SCAN_ADMIN_PASSWORD"].present?
-    @environments = Environment.order(:name) if @scan_enabled
+    if @scan_enabled
+      @environments = Environment.order(:name).to_a
+      environment_ids = @environments.map(&:id)
+      @latest_scans = Scan.where(environment_id: environment_ids)
+        .order(started_at: :desc, id: :desc)
+        .group_by(&:environment_id)
+        .transform_values(&:first)
+    end
   end
 end
