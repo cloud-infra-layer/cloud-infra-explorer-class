@@ -1,6 +1,20 @@
 class Resource < ApplicationRecord
   belongs_to :environment
 
+  scope :visible, -> { where(hidden: false) }
+  scope :hidden, -> { where(hidden: true) }
+  scope :pinned_first, -> { order(pinned: :desc, name: :asc, id: :asc) }
+
+  def self.search(query)
+    term = query.to_s.strip
+    return all if term.empty?
+
+    pattern = "%#{sanitize_sql_like(term)}%"
+    where("resources.name ILIKE :pattern OR resources.service ILIKE :pattern OR resources.resource_id ILIKE :pattern", pattern: pattern)
+  end
+
+  validates :pinned, :hidden, inclusion: { in: [ true, false ] }
+
   validates :provider, :resource_id, :service, :name, presence: true
   validates :provider, inclusion: { in: %w[aws] }
   validates :service, inclusion: { in: %w[ec2 s3] }

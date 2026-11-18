@@ -542,3 +542,70 @@ Sprint 2 is complete when:
 
 A live AWS sandbox test should be performed using approved
 read-only credentials when the end-to-end integration is ready.
+
+## 6. Sprint 3 Resource Search and Personalization (Issue #53)
+
+### Agreed state semantics
+
+- Personalization is shared by everyone viewing this application, not per user.
+  No User model or multi-user ownership is introduced.
+- Resources gain `pinned` and `hidden` booleans, each non-null with a database
+  default of false. Existing inventory remains visible and unpinned.
+- Normal inventory and dashboard counts exclude hidden resources. The UI must
+  label these as **visible resources**, explain that hidden resources are excluded,
+  and provide a discoverable hidden-inventory view with restoration controls.
+- Visible inventory sorts by pinned descending, then name ascending and ID
+  ascending. Hiding preserves the pin; restoring brings back that same pin state.
+- Hiding never deletes inventory or prevents discovery updates. Personalization
+  belongs to the database resource ID, keeping identical AWS IDs in separate
+  environments independent.
+- Discovery's seven-field allowlist stays unchanged: the adapter cannot supply
+  personalization fields, and ResourceSync must preserve them during updates.
+
+### Planned HTTP and deployment policy
+
+The following interface is the implementation target for coordination with Ian
+and Brayden; checkpoint 1 adds only persistence, scopes, and model tests.
+
+- Search uses `GET /resources?q=...&service=ec2`; the existing optional service
+  filter remains supported. Search matches literal, case-insensitive substrings
+  in name, service, or resource ID, combined with the category filter.
+- `visibility=hidden` selects hidden inventory; the default is visible inventory.
+- Explicit PATCH member actions `/resources/:id/pin`, `/unpin`, `/hide`, and
+  `/restore` set one boolean to a fixed value. GET never mutates personalization.
+- Resource writes require `ENABLE_RESOURCE_PERSONALIZATION=true` and nonblank
+  `RESOURCE_ADMIN_USERNAME` and `RESOURCE_ADMIN_PASSWORD`, using HTTP Basic auth.
+  The existing scan flag and scan credentials remain independent and unchanged.
+- Writes fail closed: disabled or incomplete configuration returns 404; enabled
+  requests with absent or incorrect credentials receive a 401 challenge.
+  Rails CSRF protection remains enabled. Hiding buttons alone is not authorization.
+- Inventory reads remain available under the existing read-access policy. Hidden
+  state is a presentation preference, not a confidentiality/access boundary.
+- Deployments leave personalization writes disabled until both credentials are
+  configured as runtime secrets and HTTPS is enforced. Never commit credentials
+  or include them in URLs, forms, resource records, or documentation examples.
+  Local HTTP testing is restricted to localhost with development-only credentials.
+- The frontend should explain that pin/hide changes affect the shared team view.
+
+Checkpoint 1 exposes `Resource.visible`, `Resource.hidden`, and
+`Resource.pinned_first`. Controllers must explicitly combine visibility and
+ordering; no default scope is added, so synchronization still finds hidden rows.
+
+Checkpoint 2 implements `Resource.search(query)` and the resource listing search
+form. Queries are trimmed; missing or whitespace-only queries leave the relation
+unrestricted. Search uses bound PostgreSQL ILIKE predicates with escaped wildcard
+characters (`%`, `_`, and backslash). Category and environment scopes remain
+composable with the search relation. HTTP array/hash values for `q` return 400;
+unsupported service filters retain the existing 404 behavior. Clearing search
+retains the selected category. No matching results have a distinct empty message.
+Visibility controls, dashboard changes, and mutation endpoints remain subsequent
+checkpoints; this checkpoint retains the existing listing visibility and ordering.
+
+Checkpoint 3 implements the four PATCH member actions and the personalization
+access guard described above. Actions locate resources by database ID (including
+hidden resources), assign only their one fixed boolean, and redirect with HTTP
+303 to `/resources` with a shared-team notice. Unrelated request attributes and
+user-supplied redirect URLs are ignored. Missing IDs return 404 after authorization.
+GET requests have no mutation route. Rails CSRF protection is retained, in addition
+to Basic authentication. UI controls and context-preserving redirects are deferred
+to the interface checkpoint; current redirects return to the unfiltered listing.
