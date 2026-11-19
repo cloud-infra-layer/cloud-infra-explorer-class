@@ -6,6 +6,51 @@ class ResourceSyncTest < ActiveSupport::TestCase
     @sync = ResourceSync.new(environment: @environment)
   end
 
+  test "refreshes personalized EC2 and S3 records without resetting state or duplicating identities" do
+    @sync.call(resources: [ ec2_record, s3_record ])
+    assert_equal [ [ false, false ], [ false, false ] ], @environment.resources.pluck(:pinned, :hidden)
+    @environment.resources.each { |resource| resource.update!(pinned: true, hidden: true) }
+    original_ids = @environment.resources.order(:id).pluck(:id)
+    changed = [ ec2_record.merge(name: "Refreshed server"), s3_record.merge(name: "Refreshed bucket") ]
+
+    assert_equal({ created: 0, updated: 2 }, @sync.call(resources: changed))
+    assert_equal original_ids, @environment.resources.order(:id).pluck(:id)
+    assert_equal [ [ true, true ], [ true, true ] ], @environment.resources.pluck(:pinned, :hidden)
+    assert_equal "Refreshed server", @environment.resources.find_by!(service: "ec2").name
+    assert_equal "Refreshed bucket", @environment.resources.find_by!(service: "s3").name
+    snapshot = @environment.resources.order(:id).map(&:attributes)
+    assert_equal({ created: 0, updated: 0 }, @sync.call(resources: changed))
+    assert_equal snapshot, @environment.resources.order(:id).map(&:attributes)
+  end
+
+  test "discovery cannot supply personalization fields or partially update the batch" do
+    @sync.call(resources: [ ec2_record, s3_record ])
+    @environment.resources.each { |resource| resource.update!(pinned: true, hidden: true) }
+    snapshot = @environment.resources.order(:id).map(&:attributes)
+
+    [ :pinned, :hidden, "pinned", "hidden" ].each do |field|
+      error = assert_raises(ResourceSync::Error) do
+        @sync.call(resources: [ ec2_record.merge(name: "Must not persist"), s3_record.merge(field => false) ])
+      end
+      assert_equal "invalid_resource", error.code
+      assert_equal snapshot, @environment.resources.order(:id).map(&:attributes)
+    end
+  end
+
+  test "matching AWS identities do not share personalization across environments" do
+    source = resources(:web_server)
+    source.update!(pinned: true, hidden: true)
+    snapshot = source.attributes
+    record = ec2_record.merge(resource_id: source.resource_id, region: source.region)
+
+    @sync.call(resources: [ record ])
+    @sync.call(resources: [ record.merge(name: "Changed in another environment") ])
+
+    assert_equal snapshot, source.reload.attributes
+    assert_not @environment.resources.sole.pinned?
+    assert_not @environment.resources.sole.hidden?
+  end
+
   test "creates both services and repeats without duplicate records or timestamp changes" do
     assert_difference "Resource.count", 2 do
       assert_equal({ created: 2, updated: 0 }, @sync.call(resources: [ ec2_record, s3_record ]))
@@ -123,6 +168,7 @@ class ResourceSyncTest < ActiveSupport::TestCase
   test "rolls back earlier inserts and updates when a later database write fails" do
     @sync.call(resources: [ ec2_record ])
     original = @environment.resources.sole
+    original.update!(pinned: true, hidden: true)
     before = original.attributes
     rejection = ->(record) do
       if record.resource_id == "reject-example-bucket"

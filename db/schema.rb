@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_06_000000) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_18_000000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -33,6 +33,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_06_000000) do
     t.string "console_url"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.boolean "pinned", default: false, null: false
+    t.boolean "hidden", default: false, null: false
     t.index ["environment_id", "provider", "region", "resource_id"], name: "index_resources_on_ec2_identity", unique: true, where: "((service)::text = 'ec2'::text)", nulls_not_distinct: true
     t.index ["environment_id", "provider", "resource_id"], name: "index_resources_on_s3_identity", unique: true, where: "((service)::text = 's3'::text)"
     t.index ["environment_id"], name: "index_resources_on_environment_id"
@@ -53,7 +55,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_06_000000) do
     t.index ["environment_id", "started_at"], name: "index_scans_on_environment_id_and_started_at"
     t.index ["environment_id"], name: "index_scans_on_environment_id"
     t.check_constraint "discovered_count >= 0 AND created_count >= 0 AND updated_count >= 0", name: "scans_nonnegative_counts"
-    t.check_constraint "status::text = ANY (ARRAY['running'::character varying, 'completed'::character varying, 'partial'::character varying, 'failed'::character varying]::text[])", name: "scans_valid_status"
+    t.check_constraint "status::text = ANY (ARRAY['running'::character varying::text, 'completed'::character varying::text, 'partial'::character varying::text, 'failed'::character varying::text])", name: "scans_valid_status"
   end
 
   add_foreign_key "resources", "environments"

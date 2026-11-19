@@ -18,6 +18,75 @@ RSpec.describe ResourceSync do
   end
 
   describe "#call" do
+    describe "shared personalization" do
+      %w[ec2 s3].each do |service|
+        it "preserves #{service.upcase} personalization during refresh and an unchanged repeat" do
+          record = service == "ec2" ? ec2_record : s3_record
+          sync.call(resources: [ record ])
+          resource = environment.resources.sole
+          expect(resource).to have_attributes(pinned: false, hidden: false)
+          resource.update!(pinned: true, hidden: true)
+          original_id = resource.id
+          changed = record.merge(name: "Refreshed #{service}", console_url: nil)
+
+          expect(sync.call(resources: [ changed ])).to eq(created: 0, updated: 1)
+          expect(resource.reload).to have_attributes(id: original_id, name: "Refreshed #{service}",
+            console_url: nil, pinned: true, hidden: true)
+          after_refresh = resource.attributes
+
+          expect(sync.call(resources: [ changed ])).to eq(created: 0, updated: 0)
+          expect(environment.resources.pluck(:id)).to eq([ original_id ])
+          expect(resource.reload.attributes).to eq(after_refresh)
+        end
+      end
+
+      it "keeps personalization independent for identical identities in different environments" do
+        other = Environment.create!(name: "Other personalized inventory", provider: "aws", region: "us-west-2")
+        sync.call(resources: [ ec2_record, s3_record ])
+        environment.resources.each { |resource| resource.update!(pinned: true, hidden: true) }
+        original = environment.resources.order(:id).map(&:attributes)
+        other_sync = described_class.new(environment: other)
+        expect(other_sync.call(resources: [ ec2_record, s3_record ])).to eq(created: 2, updated: 0)
+        other_sync.call(resources: [ ec2_record.merge(name: "Other server"), s3_record.merge(name: "Other bucket") ])
+
+        expect(other.resources.pluck(:pinned, :hidden)).to eq([ [ false, false ], [ false, false ] ])
+        expect(environment.resources.order(:id).map(&:attributes)).to eq(original)
+      end
+
+      it "preserves hidden S3 identity and personalization when its region becomes known" do
+        sync.call(resources: [ s3_record.merge(region: nil) ])
+        resource = environment.resources.sole
+        resource.update!(pinned: true, hidden: true)
+
+        expect(sync.call(resources: [ s3_record ])).to eq(created: 0, updated: 1)
+        expect(resource.reload).to have_attributes(region: "us-west-2", pinned: true, hidden: true)
+        expect(environment.resources.pluck(:id)).to eq([ resource.id ])
+      end
+
+      [ :pinned, :hidden, "pinned", "hidden" ].each do |field|
+        it "rejects discovery field #{field.inspect} without changing personalized inventory" do
+          sync.call(resources: [ ec2_record, s3_record ])
+          environment.resources.each { |resource| resource.update!(pinned: true, hidden: true) }
+          original = inventory_snapshot
+
+          expect do
+            sync.call(resources: [ ec2_record.merge(name: "Must not be saved"), s3_record.merge(field => false) ])
+          end.to raise_error(ResourceSync::Error) { |error| expect(error.code).to eq("invalid_resource") }
+          expect(inventory_snapshot).to eq(original)
+        end
+      end
+
+      it "leaves personalization intact for empty batches and omitted resources" do
+        sync.call(resources: [ ec2_record, s3_record ])
+        environment.resources.each { |resource| resource.update!(pinned: true, hidden: true) }
+        original = inventory_snapshot
+
+        expect(sync.call(resources: [])).to eq(created: 0, updated: 0)
+        expect(sync.call(resources: [ ec2_record ])).to eq(created: 0, updated: 0)
+        expect(inventory_snapshot).to eq(original)
+      end
+    end
+
     context "when discovering new inventory" do
       it "creates both services within the selected environment and reports accurate counts" do
         result = nil
@@ -227,6 +296,7 @@ RSpec.describe ResourceSync do
       shared_examples "a rolled-back batch" do |expected_code|
         it "rolls back earlier inserts and updates while allowing the caller to record the failure" do
           sync.call(resources: [ ec2_record ])
+          environment.resources.sole.update!(pinned: true, hidden: true)
           original = inventory_snapshot
           scan = environment.scans.create!(resource_types: %w[ec2 s3], started_at: Time.current)
 

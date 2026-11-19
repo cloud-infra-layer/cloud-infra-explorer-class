@@ -2,7 +2,14 @@ Rails.application.routes.draw do
   root "dashboard#index"
   get "dashboard", to: "dashboard#index", as: :dashboard
   get "home/index"
-  resources :resources, only: :index
+  resources :resources, only: :index do
+    member do
+      patch :pin
+      patch :unpin
+      patch :hide
+      patch :restore
+    end
+  end
   resources :environments, only: [] do
     resources :scans, only: :create
   end
