@@ -609,3 +609,34 @@ user-supplied redirect URLs are ignored. Missing IDs return 404 after authorizat
 GET requests have no mutation route. Rails CSRF protection is retained, in addition
 to Basic authentication. UI controls and context-preserving redirects are deferred
 to the interface checkpoint; current redirects return to the unfiltered listing.
+
+### Checkpoint 4: visibility queries and frontend handoff
+
+The resource listing now accepts `visibility=visible` (default) or
+`visibility=hidden`. Missing/blank values mean visible; unsupported values or
+arrays/hashes return 400. `@visibility` contains the selected normalized value.
+Visibility combines with `q` and `service`, and both views order pinned first,
+then name and database ID. Reads remain available independently of mutation access.
+
+The dashboard's existing `@resources_by_service` and `@resource_counts` interfaces
+now contain only visible inventory, retaining both service keys and zero counts
+when appropriate. Arrays are ordered pinned first within each service. These
+Sprint 3 semantics supersede the all-stored-inventory counts in Section 4.
+Scan controls and scan-history queries are unchanged.
+
+Ian's frontend integration remains required: label counts as visible resources,
+explain that hidden inventory is excluded and preferences are shared, add hidden
+inventory navigation/restoration controls, and preserve `visibility` alongside
+`service` and `q` in forms and links. Until that work lands, the existing template
+can render a direct hidden-inventory request but its search form and clear link
+do not retain visibility, and its empty-state/count wording still describes the
+older inventory view. This checkpoint adds no frontend controls or labels.
+
+Checkpoint 5 adds synchronization regression coverage in Minitest and RSpec.
+It checks defaults for new inventory, retention of personalization and database
+IDs on EC2/S3 refreshes, unchanged repeat counts/timestamps, separate state across
+environments, S3 null-to-known region updates, empty/omitted inventory, rejection
+of incoming personalization keys, and preservation during failed-batch rollback.
+ResourceSync's existing allowlist and identity lookup support these behaviors;
+no production service changes are needed. These tests call persistence directly
+with synthetic normalized records and make no live AWS requests.

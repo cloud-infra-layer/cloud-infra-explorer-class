@@ -1,8 +1,9 @@
 class DashboardController < ApplicationController
   def index
     resources = Resource.where(provider: "aws", service: %w[ec2 s3])
+      .visible
       .includes(:environment)
-      .order(:name, :id)
+      .pinned_first
       .group_by(&:service)
 
     @resources_by_service = {

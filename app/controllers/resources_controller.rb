@@ -7,13 +7,19 @@ class ResourcesController < ApplicationController
 
     query = params[:q]
     return head :bad_request unless query.nil? || query.is_a?(String)
+    visibility = params[:visibility]
+    return head :bad_request unless visibility.nil? || visibility.is_a?(String)
+    @visibility = visibility.presence || "visible"
+    return head :bad_request unless %w[visible hidden].include?(@visibility)
+
     @query = query.to_s.strip
     @service = service
 
     @page_title = service.present? ? "#{service.upcase} Resources" : "Resources"
     @resources = Resource.where(provider: "aws")
+    @resources = @visibility == "hidden" ? @resources.hidden : @resources.visible
     @resources = @resources.where(service: service) if service.present?
-    @resources = @resources.search(@query).order(:name, :id)
+    @resources = @resources.search(@query).pinned_first
   end
 
   def pin
