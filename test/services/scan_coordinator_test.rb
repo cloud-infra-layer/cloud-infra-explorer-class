@@ -108,9 +108,7 @@ class ScanCoordinatorTest < ActiveSupport::TestCase
     end
   end
 
-  private
-
-    test "persistence failure records a failed scan and preserves inventory" do
+  test "persistence failure records a failed scan and preserves inventory" do
     existing = @environment.resources.create!(ec2_record)
 
     failing_sync = ->(_environment) {
@@ -148,6 +146,56 @@ class ScanCoordinatorTest < ActiveSupport::TestCase
     assert existing.reload.persisted?
   end
 
+  test "successful refresh preserves personalization and database identity" do
+    ScanCoordinator.new(environment: @environment,
+      adapter: FakeAdapter.new(resources: [ ec2_record, s3_record ], errors: [])).call
+    @environment.resources.each { |resource| resource.update!(pinned: true, hidden: true) }
+    original_ids = @environment.resources.order(:id).pluck(:id)
+    refreshed = [
+      ec2_record.merge(name: "Refreshed EC2", metadata: { instance_type: "t3.small", state: "stopped" }),
+      s3_record.merge(name: "Refreshed bucket")
+    ]
+
+    scan = ScanCoordinator.new(environment: @environment,
+      adapter: FakeAdapter.new(resources: refreshed, errors: [])).call
+
+    assert_equal "completed", scan.status
+    assert_equal 0, scan.created_count
+    assert_equal 2, scan.updated_count
+    assert_equal original_ids, @environment.resources.order(:id).pluck(:id)
+    assert_equal [ [ true, true ], [ true, true ] ], @environment.resources.order(:id).pluck(:pinned, :hidden)
+    assert_equal "Refreshed EC2", @environment.resources.find_by!(service: "ec2").name
+    assert_equal({ "instance_type" => "t3.small", "state" => "stopped" },
+      @environment.resources.find_by!(service: "ec2").metadata)
+  end
+
+  test "partial and failed scans leave personalized inventory untouched" do
+    ScanCoordinator.new(environment: @environment,
+      adapter: FakeAdapter.new(resources: [ ec2_record, s3_record ], errors: [])).call
+    @environment.resources.each { |resource| resource.update!(pinned: true, hidden: true) }
+    snapshot = @environment.resources.order(:id).map(&:attributes)
+
+    partial = ScanCoordinator.new(environment: @environment, adapter: FakeAdapter.new(
+      resources: [ ec2_record.merge(name: "Must not apply"), s3_record ],
+      errors: [ { resource_type: "ec2", code: "aws_api_error", message: "EC2 unavailable." } ]
+    )).call
+    assert_equal "partial", partial.status
+    assert_equal 0, partial.created_count
+    assert_equal 0, partial.updated_count
+    assert_equal snapshot, @environment.resources.order(:id).map(&:attributes)
+
+    failed = ScanCoordinator.new(environment: @environment, adapter: FakeAdapter.new(
+      resources: [],
+      errors: [
+        { resource_type: "ec2", code: "credentials_unavailable", message: "No credentials." },
+        { resource_type: "s3", code: "credentials_unavailable", message: "No credentials." }
+      ]
+    )).call
+    assert_equal "failed", failed.status
+    assert_equal snapshot, @environment.resources.order(:id).map(&:attributes)
+  end
+
+  private
 
   def ec2_record
     { provider: "aws", resource_id: "i-scan-integration", service: "ec2",

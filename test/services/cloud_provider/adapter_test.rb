@@ -24,6 +24,20 @@ class CloudProviderAdapterTest < Minitest::Test
       console_url: "https://us-east-2.console.aws.amazon.com/ec2/home?region=us-east-2#InstanceDetails:instanceId=i-0123456789abcdef0"
     } ], result[:resources]
     refute_includes result.to_s, "private-tag-value"
+    assert_equal NORMALIZED_FIELDS, result[:resources].first.keys
+    refute_includes result[:resources].first.keys, :pinned
+    refute_includes result[:resources].first.keys, :hidden
+  end
+
+  def test_repeated_discovery_returns_identical_normalized_identities
+    @client.stub_responses(:describe_instances, reservations: [ { instances: [ instance ] } ])
+    first = @adapter.list_resources(@context)
+    second = @adapter.list_resources(@context)
+
+    assert_empty first[:errors]
+    assert_equal first, second
+    assert_equal "i-0123456789abcdef0", first[:resources].first[:resource_id]
+    assert_equal({ instance_type: "t3.micro", state: "running" }, first[:resources].first[:metadata])
   end
 
   def test_scans_each_requested_region_with_the_same_adapter
@@ -103,8 +117,12 @@ class CloudProviderAdapterTest < Minitest::Test
   end
 
   def test_missing_or_expired_local_credentials_are_safe_even_during_client_creation
-    [ Aws::Errors::MissingCredentialsError, Aws::Errors::InvalidLoginToken,
-      Aws::Errors::NoSuchProfileError ].each do |error_class|
+    [
+      Aws::Errors::MissingCredentialsError, Aws::Errors::NoSuchProfileError,
+      Aws::Errors::NoSourceProfileError, Aws::Errors::NoSourceCredentialsError,
+      Aws::Errors::InvalidLoginToken, Aws::Errors::InvalidSSOToken,
+      Aws::Errors::InvalidSSOCredentials, Aws::Errors::InvalidProcessCredentialsPayload
+    ].each do |error_class|
       adapter = CloudProvider::Adapter.new(ec2_client_factory: ->(_) { raise error_class, "sensitive AWS response" })
       assert_failure(adapter.list_resources(@context), "credentials_unavailable")
     end
@@ -151,6 +169,8 @@ class CloudProviderAdapterTest < Minitest::Test
   end
 
   private
+
+  NORMALIZED_FIELDS = %i[provider resource_id service name region metadata console_url].freeze
 
   def instance
     { instance_id: "i-0123456789abcdef0", instance_type: "t3.micro", state: { name: "running" },

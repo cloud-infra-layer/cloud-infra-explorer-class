@@ -16,6 +16,8 @@ Every AWS resource discovered by our application must be converted into a consis
 | metadata | Hash | Additional non-secret resource properties |
 | console_url | String, nullable | Direct AWS Console link when available |
 
+These seven fields are the only discovery payload. PostgreSQL resource rows may also store application-owned columns such as shared personalization flags (`pinned`, `hidden`). The adapter must never emit those fields, and ResourceSync must reject them if they appear in a discovery batch. Persistence updates discovery attributes in place so personalization and database IDs survive repeated scans.
+
 ### Example EC2 Resource
 
 ```ruby
