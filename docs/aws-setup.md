@@ -287,7 +287,44 @@ Cleanup waits for termination and removes the test security group. The root volu
 
 There is no scheduled cleanup. Agree on who will remove retained resources when testing or the project ends. Rerun cleanup if it fails and inspect remaining tagged resources. Use a fresh run ID only when creating a new instance.
 
-## 7. Automated tests and troubleshooting
+## 7. Sandbox verification checklist and known limitations
+
+Use this checklist for Issue #52-style reliability checks. It does not change IAM roles, policies, or other provider infrastructure.
+
+### Live verification (local only; never in CI)
+
+1. Confirm the discovery identity: `aws sts get-caller-identity --profile cloud-explorer-dev` shows account `821058455060` and role `CloudExplorerDiscovery`.
+2. Run read-only discovery:
+
+```bash
+AWS_PROFILE=cloud-explorer-dev AWS_REGION=us-east-2 bundle exec ruby script/verify_resources.rb
+```
+
+3. Confirm the JSON result:
+   - Exit status `0` with `"errors": []` means both services completed (an empty `resources` array is valid).
+   - A per-service error must not be treated as proof that inventory disappeared.
+   - Successful resources match the seven-field normalized contract (`provider`, `resource_id`, `service`, `name`, `region`, `metadata`, `console_url`) with no personalization keys.
+4. Optional single-service checks: `--services ec2` or `--services s3`.
+5. Optional Rails console call (same profile): `CloudProvider::Adapter.new.list_resources(provider: "aws", region: "us-east-2", resource_types: ["ec2", "s3"])`.
+
+Record the date, profile, region, exit status, resource counts, and any error codes in the team notes when closing a reliability ticket. Do not paste credentials, account secrets, or raw SDK exception text into Git.
+
+### Known limitations
+
+| Topic | Behavior |
+|---|---|
+| Scope | One explicit region per request; no automatic multi-region enumeration |
+| S3 inventory | Account-owned general-purpose buckets in the requested region only; directory buckets and cross-account buckets are out of scope |
+| Per-service results | Discovery is all-or-nothing within EC2 or S3; a failed page or invalid required field discards that service's results |
+| Partial scans | The other service may still succeed; the coordinator must not delete existing inventory for the failed service |
+| Absent resources | Sprint 2/3 sync does not delete resources missing from a successful scan |
+| Metadata | EC2 allowlists `instance_type` and `state` only; S3 metadata is `{}`; tags and raw SDK payloads are not stored |
+| Console links | Commercial AWS partition regions only; other partitions return `console_url: nil` |
+| Personalization | `pinned` / `hidden` live only in PostgreSQL; discovery never supplies or clears them |
+| Credentials | Read-only discovery role; setup profile is for manual test resources only |
+| CI | Adapter tests use stubbed SDK clients; live AWS credentials must not be added to GitHub Actions |
+
+## 8. Automated tests and troubleshooting
 
 These tests use mocked AWS responses and a fake CLI; they do not access AWS or require PostgreSQL:
 

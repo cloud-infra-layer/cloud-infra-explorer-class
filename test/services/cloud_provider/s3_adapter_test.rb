@@ -23,10 +23,24 @@ class S3AdapterTest < Minitest::Test
     assert_equal({ provider: "aws", resource_id: "example-bucket", service: "s3",
       name: "example-bucket", region: @region, metadata: {},
       console_url: "https://s3.console.aws.amazon.com/s3/buckets/example-bucket?region=eu-west-1&tab=objects" }, result[:resources].first)
+    assert_equal NORMALIZED_FIELDS, result[:resources].first.keys
+    refute_includes result[:resources].first.keys, :pinned
+    refute_includes result[:resources].first.keys, :hidden
     assert_equal [ :list_buckets, :list_buckets ], @s3.api_requests.map { |r| r[:operation_name] }
     assert_equal({ bucket_region: @region, max_buckets: 1000 }, @s3.api_requests.first[:params])
     assert_equal({ bucket_region: @region, max_buckets: 1000, continuation_token: "next" }, @s3.api_requests.last[:params])
     assert_empty @ec2.api_requests
+  end
+
+  def test_repeated_discovery_returns_identical_normalized_identities
+    @s3.stub_responses(:list_buckets, buckets: [ bucket ])
+    first = @adapter.list_resources(@context)
+    second = @adapter.list_resources(@context)
+
+    assert_empty first[:errors]
+    assert_equal first, second
+    assert_equal "example-bucket", first[:resources].first[:resource_id]
+    assert_equal({}, first[:resources].first[:metadata])
   end
 
   def test_valid_empty_inventory_and_duplicate_string_types
@@ -74,6 +88,12 @@ class S3AdapterTest < Minitest::Test
         result = @adapter.list_resources(@context.merge(resource_types: types))
         assert_equal(types.reject { |t| t == failed }.sort, result[:resources].map { |r| r[:service] }.sort)
         assert_equal(failed ? [ failed ] : [], result[:errors].map { |e| e[:resource_type] })
+        next if failed.nil?
+
+        surviving = types.reject { |type| type == failed }.first
+        assert_equal [ surviving ], result[:resources].map { |resource| resource[:service] }.uniq
+        assert_empty result[:resources].select { |resource| resource[:service] == failed }
+        refute_includes result.to_s, "sensitive"
       end
     end
   end
@@ -121,6 +141,8 @@ class S3AdapterTest < Minitest::Test
   end
 
   private
+
+  NORMALIZED_FIELDS = %i[provider resource_id service name region metadata console_url].freeze
 
   def bucket
     { name: "example-bucket", bucket_region: @region, creation_date: Time.utc(2020, 1, 1) }
