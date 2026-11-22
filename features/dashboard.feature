@@ -13,8 +13,12 @@ Feature: Cloud infrastructure dashboard
     Given the application contains an EC2 instance named "web-server"
     And the application contains an S3 bucket named "assets-bucket"
     When I visit the dashboard
+    Then I should see one resource in each category
+    When I click the EC2 category
     Then I should see "web-server"
-    And I should see "assets-bucket"
+    When I click "Back to dashboard"
+    And I click the S3 category
+    Then I should see "assets-bucket"
 
   Scenario: Viewing an empty inventory
     Given the application has an empty resource inventory
