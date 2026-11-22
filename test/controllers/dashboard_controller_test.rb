@@ -69,7 +69,7 @@ class DashboardControllerTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_select "main script", count: 0
-    assert_select "tbody", text: /alert\\('example'\\)/
+    assert_select "tbody th", text: resource.name
   end
 
   # Ian's frontend dashboard tests
