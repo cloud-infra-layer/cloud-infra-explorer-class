@@ -50,8 +50,16 @@ Then('I should see the cloud infrastructure dashboard') do
 end
 
 Then('I should see the EC2 and S3 resource categories') do
-  expect(page).to have_css("#ec2-resources")
-  expect(page).to have_css("#s3-resources")
+  expect(page).to have_css("a.category-card[href='#{resources_path(service: 'ec2')}']", text: "EC2 Instances")
+  expect(page).to have_css("a.category-card[href='#{resources_path(service: 's3')}']", text: "S3 Buckets")
+end
+
+Then('I should see one resource in each category') do
+  [ "ec2", "s3" ].each do |service|
+    within("a.category-card[href='#{resources_path(service: service)}']") do
+      expect(page).to have_css(".resource-count", text: "1 resource")
+    end
+  end
 end
 
 Then('I should see {string}') do |text|
