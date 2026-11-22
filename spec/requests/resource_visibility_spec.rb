@@ -66,7 +66,7 @@ RSpec.describe "Inventory visibility and ordering", type: :request do
     expect(listed_names).to eq([ second.name ])
   end
 
-  it "uses visible inventory for dashboard ordering, tables, and card counts on both routes" do
+  it "uses visible inventory for dashboard card counts on both routes" do
     ordinary = create_resource("i-ordinary", name: "Alpha")
     pinned = create_resource("i-pinned", name: "Zebra", pinned: true)
     create_resource("i-hidden", hidden: true, pinned: true)
@@ -76,10 +76,10 @@ RSpec.describe "Inventory visibility and ordering", type: :request do
       get path
       expect(response).to have_http_status(:ok)
       document = Nokogiri::HTML(response.body)
-      expect(document.css("#ec2-resources tbody tr").map { |row| row["id"] }).to eq([ "resource-#{pinned.id}", "resource-#{ordinary.id}" ])
-      expect(document.at_css("#ec2-resources .resource-count").text.strip).to eq("2 resources")
-      expect(document.at_css("#s3-resources .resource-count").text.strip).to eq("0 resources")
-      expect(document.css("#s3-resources table")).to be_empty
+      expect(document.css("#ec2-resources tbody tr")).to be_empty
+      expect(document.css(".category-grid table")).to be_empty
+      expect(document.css("a.category-card[href='#{resources_path(service: 'ec2')}'] .resource-count").map { |node| node.text.strip }).to eq([ "2 resources" ])
+      expect(document.css("a.category-card[href='#{resources_path(service: 's3')}'] .resource-count").map { |node| node.text.strip }).to eq([ "0 resources" ])
       expect(document.css(".category-card .resource-count").map { |node| node.text.strip }).to eq([ "2 resources", "0 resources" ])
     end
   end
