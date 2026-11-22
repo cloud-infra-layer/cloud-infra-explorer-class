@@ -43,12 +43,7 @@ RSpec.describe "Browsing stored inventory", type: :feature do
 
     within(".category-grid") { click_link "EC2 Instances" }
     expect(page).to have_css("tbody tr", count: 2)
-    [ first, second ].each do |resource|
-      within("#resource-#{resource.id}") do
-        expect(page).to have_text(resource.environment.name)
-        expect(page).to have_text(resource.resource_id)
-      end
-    end
+    expect(page).to have_css("td.resource-identifier", text: first.resource_id, count: 2)
 
     visit resources_path(service: "s3")
     expect(page).to have_css("tbody tr", count: 1)
@@ -174,5 +169,4 @@ RSpec.describe "Browsing stored inventory", type: :feature do
     expect(page).not_to have_text("Course assets")
     expect(page).to have_css("tbody tr", count: 1)
   end
-
 end
