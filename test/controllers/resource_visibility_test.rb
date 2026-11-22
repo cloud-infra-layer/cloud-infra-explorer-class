@@ -37,9 +37,12 @@ class ResourceVisibilityTest < ActionDispatch::IntegrationTest
     web.update!(hidden: true)
     get dashboard_path
     assert_response :success
-    assert_select "#ec2-resources .resource-count", text: "0 resources"
-    assert_select "#ec2-resources table", count: 0
-    assert_select "#s3-resources .resource-count", text: "1 resource"
+    assert_select "a.category-card[href=?]", resources_path(service: "ec2") do
+      assert_select ".resource-count", text: "0 resources"
+    end
+    assert_select "a.category-card[href=?]", resources_path(service: "s3") do
+      assert_select ".resource-count", text: "1 resource"
+    end
     assert_select ".category-card .resource-count", text: "0 resources", count: 1
     assert_select ".category-card .resource-count", text: "1 resource", count: 1
     assert web.reload.hidden?
