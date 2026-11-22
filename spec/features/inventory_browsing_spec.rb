@@ -34,27 +34,26 @@ RSpec.describe "Browsing stored inventory", type: :feature do
 
     visit root_path
 
-    within("#ec2-resources") do
-      expect(page).to have_css(".resource-count", text: "2 resources")
-      expect(page).to have_css("tbody tr", count: 2)
-      [ first, second ].each do |resource|
-        within("#resource-#{resource.id}") do
-          expect(page).to have_text(resource.environment.name)
-          expect(page).to have_text(resource.resource_id)
-        end
-      end
-    end
-    within("#s3-resources") do
-      expect(page).to have_css(".resource-count", text: "1 resource")
-      expect(page).to have_text("Course assets")
-      expect(page).to have_text("Not specified")
-    end
     within("a.category-card", text: "EC2 Instances") do
       expect(page).to have_css(".resource-count", text: "2 resources")
     end
     within("a.category-card", text: "S3 Buckets") do
       expect(page).to have_css(".resource-count", text: "1 resource")
     end
+
+    within(".category-grid") { click_link "EC2 Instances" }
+    expect(page).to have_css("tbody tr", count: 2)
+    [ first, second ].each do |resource|
+      within("#resource-#{resource.id}") do
+        expect(page).to have_text(resource.environment.name)
+        expect(page).to have_text(resource.resource_id)
+      end
+    end
+
+    visit resources_path(service: "s3")
+    expect(page).to have_css("tbody tr", count: 1)
+    expect(page).to have_text("Course assets")
+    expect(page).to have_text("Unknown")
   end
 
   it "lets a user follow category cards, switch categories, and return to the dashboard" do
@@ -95,14 +94,12 @@ RSpec.describe "Browsing stored inventory", type: :feature do
 
     visit root_path
 
-    expect(page).to have_css("#ec2-resources tbody tr", count: 1)
-    within("#s3-resources") do
-      expect(page).to have_text("No S3 buckets stored yet.")
-      expect(page).to have_css(".resource-count", text: "0 resources")
-      expect(page).not_to have_css("table")
+    within("a.category-card", text: "EC2 Instances") do
+      expect(page).to have_css(".resource-count", text: "1 resource")
     end
     within("a.category-card", text: "S3 Buckets") do
-      expect(page).to have_text("0 resources")
+      expect(page).to have_css(".resource-count", text: "0 resources")
+      expect(page).to have_text("No stored resources yet.")
     end
     within(".category-grid") { click_link "S3 Buckets" }
     expect(page).to have_text("No S3 resources found.")
@@ -113,8 +110,7 @@ RSpec.describe "Browsing stored inventory", type: :feature do
     visit root_path
 
     expect(page).to have_css(".category-card .resource-count", text: "0 resources", count: 2)
-    expect(page).to have_text("No EC2 instances stored yet.")
-    expect(page).to have_text("No S3 buckets stored yet.")
+    expect(page).to have_css(".category-card .category-description", text: "No stored resources yet.", count: 2)
     expect(page).not_to have_css("table")
 
     within(".category-grid") { click_link "EC2 Instances" }
@@ -130,23 +126,27 @@ RSpec.describe "Browsing stored inventory", type: :feature do
     sync = ResourceSync.new(environment: environment)
     sync.call(resources: [ instance_attributes ])
     visit root_path
-    expect(page).to have_text("Course web server")
+    expect(page).to have_css("a.category-card", text: "1 resource")
 
     updated = instance_attributes.merge(name: "Renamed web server")
     sync.call(resources: [ updated, bucket_attributes ])
     sync.call(resources: [ updated, bucket_attributes ])
     visit root_path
 
-    within("#ec2-resources") do
-      expect(page).to have_text("Renamed web server")
-      expect(page).not_to have_text("Course web server")
-      expect(page).to have_css("tbody tr", count: 1)
+    within("a.category-card", text: "EC2 Instances") do
       expect(page).to have_css(".resource-count", text: "1 resource")
     end
-    within("#s3-resources") do
-      expect(page).to have_text("Course assets")
-      expect(page).to have_css("tbody tr", count: 1)
+    within("a.category-card", text: "S3 Buckets") do
+      expect(page).to have_css(".resource-count", text: "1 resource")
     end
+    within(".category-grid") { click_link "EC2 Instances" }
+    expect(page).to have_text("Renamed web server")
+    expect(page).not_to have_text("Course web server")
+    expect(page).to have_css("tbody tr", count: 1)
+
+    visit resources_path(service: "s3")
+    expect(page).to have_text("Course assets")
+    expect(page).to have_css("tbody tr", count: 1)
   end
 
   it "continues to display the previous inventory after a rejected sync batch" do
@@ -161,11 +161,18 @@ RSpec.describe "Browsing stored inventory", type: :feature do
     end.to raise_error(ResourceSync::Error) { |error| expect(error.code).to eq("invalid_resource") }
 
     visit root_path
+    within("a.category-card", text: "EC2 Instances") do
+      expect(page).to have_css(".resource-count", text: "1 resource")
+    end
+    within("a.category-card", text: "S3 Buckets") do
+      expect(page).to have_css(".resource-count", text: "0 resources")
+    end
 
+    within(".category-grid") { click_link "EC2 Instances" }
     expect(page).to have_text("Course web server")
     expect(page).not_to have_text("Uncommitted rename")
     expect(page).not_to have_text("Course assets")
-    expect(page).to have_css("#ec2-resources tbody tr", count: 1)
-    expect(page).to have_text("No S3 buckets stored yet.")
+    expect(page).to have_css("tbody tr", count: 1)
   end
+
 end
