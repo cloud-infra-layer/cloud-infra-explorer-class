@@ -112,3 +112,81 @@ p { margin: 0 0 1rem; }
   .main-content { padding: 1.75rem 1rem; }
   .content-panel { padding: 1.25rem; }
 }
+
+.connected-account-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1.5rem;
+  width: 100%;
+  padding: 1.5rem 1.75rem;
+  margin-bottom: 1.5rem;
+  background: #fff;
+  border: 1px solid #dce3ed;
+  border-radius: 0.75rem;
+}
+
+.account-details h2 {
+  margin: 0.3rem 0;
+  font-size: 1.3rem;
+}
+
+.account-label {
+  color: #526176;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.account-region {
+  color: #526176;
+  font-size: 0.9rem;
+  margin-bottom: 0.8rem;
+}
+
+.refresh-button {
+  background: #14243b;
+  color: white;
+  border: none;
+  border-radius: 0.4rem;
+  padding: 0.65rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.refresh-button:hover {
+  background: #304d70;
+}
+
+.refresh-button:focus-visible {
+  outline: 3px solid #397ee5;
+  outline-offset: 3px;
+}
+
+.account-update {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  text-align: right;
+  font-size: 0.875rem;
+  color: #526176;
+}
+
+.update-label {
+  color: #15803d;
+  font-weight: 700;
+}
+
+@media (max-width: 640px) {
+  .connected-account-card {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .account-update {
+    align-items: flex-start;
+    text-align: left;
+  }
+}
+
