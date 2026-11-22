@@ -22,7 +22,7 @@ RSpec.describe "Inventory HTTP responses", type: :request do
       expect(response.media_type).to eq("text/html")
       document = Nokogiri::HTML(response.body)
       expect(document.at_css("h1").text).to eq("Cloud Infrastructure Explorer")
-      expect(document.css("main .empty-state").size).to eq(2)
+      expect(document.css("main .category-card .category-description").map { |node| node.text.strip }).to eq([ "No stored resources yet.", "No stored resources yet." ])
       expect(document.css("main table")).to be_empty
     end
   end
@@ -51,7 +51,7 @@ RSpec.describe "Inventory HTTP responses", type: :request do
     end
   end
 
-  it "escapes stored resource and environment fields on the dashboard" do
+  it "escapes stored environment fields on the dashboard and resource fields in listings" do
     html = "<script>alert('inventory')</script>"
     instance.update!(name: html, resource_id: html, region: html)
     environment.update!(name: html)
@@ -61,7 +61,14 @@ RSpec.describe "Inventory HTTP responses", type: :request do
     expect(response).to have_http_status(:ok)
     document = Nokogiri::HTML(response.body)
     expect(document.css("main script")).to be_empty
-    expect(document.css("#resource-#{instance.id} td").map(&:text)).to eq([ html ] * 4)
+    expect(document.at_css(".connected-account-card h2").text).to eq(html)
+    expect(response.body).to include("&lt;script&gt;")
+
+    get resources_path, params: { service: "ec2" }
+    expect(response).to have_http_status(:ok)
+    listing = Nokogiri::HTML(response.body)
+    expect(listing.css("tbody script")).to be_empty
+    expect(listing.at_css("tbody th").text).to eq(html)
     expect(response.body).to include("&lt;script&gt;")
   end
 

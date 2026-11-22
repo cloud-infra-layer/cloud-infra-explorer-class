@@ -3,14 +3,6 @@
 
 <header>
   <h1>Cloud Infrastructure Explorer</h1>
-  <p class="page-description">
-    Stored AWS resources across all environments. Scans run only when explicitly requested by an authorized administrator.
-  </p>
-
-  <nav aria-label="Resource categories">
-    <%= link_to "EC2 instances", "#ec2-resources" %>
-    <%= link_to "S3 buckets", "#s3-resources" %>
-  </nav>
 </header>
 
 <% if flash[:notice].present? %>
@@ -20,30 +12,37 @@
   <p role="alert"><%= flash[:alert] %></p>
 <% end %>
 
-<% if @scan_enabled %>
-  <section aria-labelledby="scan-heading">
-    <h2 id="scan-heading">Manual AWS discovery</h2>
-    <p>Scanning uses the application's configured read-only AWS credentials.</p>
-    <% @environments.each do |environment| %>
-      <%= form_with url: environment_scans_path(environment), method: :post do %>
-        <p><%= environment.name %> (<%= environment.region %>)</p>
-        <% if (scan = @latest_scans[environment.id]) %>
-          <p role="status">Latest scan: <%= scan.status %> (<%= scan.discovered_count %> discovered, <%= scan.created_count %> created, <%= scan.updated_count %> updated).</p>
-          <% if scan.error_details.any? %>
-            <ul aria-label="Scan errors">
-              <% scan.error_details.each do |error| %>
-                <li><%= error.fetch("resource_type") %>: <%= error.fetch("message") %></li>
-              <% end %>
-            </ul>
-          <% end %>
-        <% else %>
-          <p>No scans recorded for this environment.</p>
+
+<% if @connected_environment %>
+  <section class="connected-account-card" aria-label="Connected AWS account">
+    <div class="account-details">
+      <span class="account-label">CONNECTED ACCOUNT</span>
+
+      <h2><%= @connected_environment.name %></h2>
+
+      <p class="account-region">
+        AWS · <%= @connected_environment.region %>
+      </p>
+
+      <% if @scan_enabled %>
+        <%= form_with url: environment_scans_path(@connected_environment), method: :post do %>
+          <%= hidden_field_tag "resource_types[]", "ec2" %>
+          <%= hidden_field_tag "resource_types[]", "s3" %>
+          <%= submit_tag "Refresh resources", class: "refresh-button" %>
         <% end %>
-        <%= hidden_field_tag "resource_types[]", "ec2" %>
-        <%= hidden_field_tag "resource_types[]", "s3" %>
-        <%= submit_tag "Scan EC2 and S3" %>
       <% end %>
-    <% end %>
+    </div>
+
+    <div class="account-update">
+      <span class="update-label">● Last updated</span>
+
+      <% if @last_successful_scan %>
+        <%= time_tag @last_successful_scan.completed_at,
+          @last_successful_scan.completed_at.in_time_zone.strftime("%b %-d, %Y at %-I:%M %p") %>
+      <% else %>
+        <span>No successful scans yet</span>
+      <% end %>
+    </div>
   </section>
 <% end %>
 
@@ -59,39 +58,3 @@
       count: @resource_counts.fetch("s3", 0) %>
 </div>
 
-<% { "ec2" => "EC2 instances", "s3" => "S3 buckets" }.each do |service, label| %>
-  <section id="<%= service %>-resources" aria-labelledby="<%= service %>-heading">
-    <h2 id="<%= service %>-heading"><%= label %></h2>
-
-    <p class="resource-count">
-      <%= pluralize(@resource_counts.fetch(service), "resource") %>
-    </p>
-
-    <% if @resources_by_service.fetch(service).empty? %>
-      <p class="empty-state">No <%= label %> stored yet.</p>
-    <% else %>
-      <table>
-        <caption><%= label %> across all environments</caption>
-        <thead>
-          <tr>
-            <th scope="col">Name</th>
-            <th scope="col">Environment</th>
-            <th scope="col">Region</th>
-            <th scope="col">Resource ID</th>
-          </tr>
-        </thead>
-
-        <tbody>
-          <% @resources_by_service.fetch(service).each do |resource| %>
-            <tr id="resource-<%= resource.id %>">
-              <td><%= resource.name %></td>
-              <td><%= resource.environment.name %></td>
-              <td><%= resource.region.presence || "Not specified" %></td>
-              <td><%= resource.resource_id %></td>
-            </tr>
-          <% end %>
-        </tbody>
-      </table>
-    <% end %>
-  </section>
-<% end %>

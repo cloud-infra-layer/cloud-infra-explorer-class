@@ -71,23 +71,44 @@ class ScansControllerTest < ActionDispatch::IntegrationTest
   end
 
 
-  test "dashboard shows latest persisted scan status and safe error messages for the selected environment" do
+  test "dashboard shows one refresh form and last completed scan for selected account" do
     enable_scans
-    older = @environment.scans.create!(resource_types: %w[ec2], started_at: 2.hours.ago)
-    older.update!(status: "completed", completed_at: 1.hour.ago,
-      discovered_count: 1, created_count: 1, updated_count: 0)
+    selected = Environment.find_or_create_by!(
+      name: "AWS Sandbox", provider: "aws", region: "us-east-2"
+    )
+    completed_at = 1.hour.ago.change(sec: 0)
+    completed = selected.scans.create!(
+      resource_types: %w[ec2],
+      started_at: completed_at - 5.minutes
+    )
+    completed.update!(
+      status: "completed", completed_at: completed_at,
+      discovered_count: 1, created_count: 1, updated_count: 0
+    )
 
-    newest = @environment.scans.create!(resource_types: %w[ec2 s3], started_at: 30.minutes.ago)
-    newest.update!(status: "partial", completed_at: 20.minutes.ago,
+    partial = selected.scans.create!(
+      resource_types: %w[ec2 s3], started_at: 30.minutes.ago
+    )
+    partial.update!(
+      status: "partial", completed_at: 20.minutes.ago,
       discovered_count: 2, created_count: 0, updated_count: 1,
-      error_details: [ { "resource_type" => "s3", "code" => "aws_api_error",
-        "message" => "S3 discovery unavailable." } ])
+      error_details: [ {
+        "resource_type" => "s3", "code" => "aws_api_error",
+        "message" => "S3 discovery unavailable."
+      } ]
+    )
 
     get dashboard_path
     assert_response :success
-    assert_select "p[role=status]", text: /Latest scan: partial \(2 discovered, 0 created, 1 updated\)/
-    assert_select "li", text: /s3: S3 discovery unavailable\./
-    assert_select "p[role=status]", text: /Latest scan: completed/, count: 0
+    assert_select ".connected-account-card", count: 1 do
+      assert_select "h2", text: "AWS Sandbox"
+      assert_select "form[action=?]", environment_scans_path(selected), count: 1
+      assert_select "time[datetime]", count: 1 do |nodes|
+        assert_equal completed_at.to_i, Time.iso8601(nodes.first["datetime"]).to_i
+      end
+      assert_select "p[role=status]", count: 0
+    end
+    assert_select "li", text: /S3 discovery unavailable/, count: 0
   end
 
   test "dashboard does not expose scan history when manual scans are disabled" do
