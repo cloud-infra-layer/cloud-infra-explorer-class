@@ -14,6 +14,14 @@ class DashboardController < ApplicationController
 
     @resource_counts = @resources_by_service.transform_values(&:size)
 
+    visible_resources = @resources_by_service.values.flatten
+
+    @dashboard_stats = {
+      active_services: @resource_counts.count { |_, count| count.positive? },
+      total_resources: visible_resources.size,
+      pinned: visible_resources.count(&:pinned?)
+    }
+
     @scan_enabled = ENV["ENABLE_MANUAL_SCANS"] == "true" &&
       ENV["SCAN_ADMIN_USERNAME"].present? &&
       ENV["SCAN_ADMIN_PASSWORD"].present?
