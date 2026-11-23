@@ -85,8 +85,3 @@ end
 When("I visit the resource inventory") do
   visit resources_path
 end
-
-When("I search for {string}") do |query|
-  fill_in "Search resources", with: query
-  click_button "Search"
-end
