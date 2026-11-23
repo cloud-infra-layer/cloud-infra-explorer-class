@@ -1,0 +1,54 @@
+require "test_helper"
+
+class ManualScanControlsTest < ActionDispatch::SystemTestCase
+  driven_by :selenium, using: :headless_chrome do |options|
+    options.binary = ENV["CHROME_BIN"] if ENV["CHROME_BIN"].present?
+    options.add_argument("--no-sandbox") if ENV["CHROME_NO_SANDBOX"] == "1"
+  end
+
+  setup do
+    @scan_settings = {
+      "ENABLE_MANUAL_SCANS" => "true",
+      "SCAN_ADMIN_USERNAME" => "system-test-admin",
+      "SCAN_ADMIN_PASSWORD" => "system-test-password"
+    }
+    @previous_settings = ENV.to_h.slice(*@scan_settings.keys)
+    ENV.update(@scan_settings)
+  end
+
+  teardown do
+    @scan_settings.each_key { |key| ENV[key] = @previous_settings[key] }
+  end
+
+  test "mobile and desktop controls show loading and prevent duplicate submission" do
+    [ [ 1280, 900 ], [ 390, 844 ] ].each do |width, height|
+      page.current_window.resize_to(width, height)
+      visit dashboard_path
+      select "Course testing (us-west-2)", from: "AWS environment"
+      click_button "View environment"
+
+      assert_selector ".account-details h2", text: "Course testing"
+      assert_selector "form.scan-form[action='#{environment_scans_path(environments(:course_testing))}']"
+      assert_operator page.evaluate_script("document.documentElement.scrollWidth"), :<=,
+        page.evaluate_script("window.innerWidth")
+      within ".scan-form" do
+        uncheck "EC2"
+        uncheck "S3"
+        click_button "Refresh resources"
+        assert_selector "[role=status]", text: "Select at least one service."
+        check "S3"
+
+        # Hold the browser on the page so the pending state can be inspected without sending a scan request.
+        page.execute_script(<<~JS)
+          document.querySelector(".scan-form").addEventListener("submit", event => event.preventDefault(), { once: true })
+        JS
+        click_button "Refresh resources"
+        assert_button "Scanning…", disabled: true
+        assert_selector "[role=status]", text: "Scan in progress."
+        assert page.evaluate_script(<<~JS)
+          !document.querySelector(".scan-form").dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }))
+        JS
+      end
+    end
+  end
+end

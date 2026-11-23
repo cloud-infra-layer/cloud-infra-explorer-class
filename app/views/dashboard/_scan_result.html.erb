@@ -1,0 +1,22 @@
+<section class="scan-result" aria-label="Latest scan result">
+  <% if scan %>
+    <p>Latest scan: <strong><%= scan.status == "running" ? "In progress" : scan.status.capitalize %></strong></p>
+    <% unless scan.status == "running" %>
+      <p><%= scan.created_count %> created · <%= scan.updated_count %> updated</p>
+      <% if scan.status == "completed" && scan.discovered_count.zero? %>
+        <p>No resources found for the selected services.</p>
+      <% end %>
+      <% if scan.error_details.any? %>
+        <ul aria-label="Scan errors">
+          <% scan.error_details.each do |error| %>
+            <li><%= error.fetch("resource_type").upcase %>: <%= error.fetch("message") %></li>
+          <% end %>
+        </ul>
+      <% elsif scan.status.in?(%w[partial failed]) %>
+        <p>No error details were recorded.</p>
+      <% end %>
+    <% end %>
+  <% else %>
+    <p>No scans recorded for this environment.</p>
+  <% end %>
+</section>

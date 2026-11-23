@@ -4,11 +4,12 @@ class ScansController < ApplicationController
   def create
     environment = Environment.find(params[:environment_id])
     types = params[:resource_types]
-    types = %w[ec2 s3] if types.nil?
+    # Unchecked checkboxes omit resource_types, while existing clients can omit it to scan both.
+    types = Scan::RESOURCE_TYPES if types.nil? && !params.key?(:scan_form)
 
     unless types.is_a?(Array) && types.any? && types.uniq == types &&
         types.all? { |type| Scan::RESOURCE_TYPES.include?(type) }
-      return redirect_to dashboard_path, alert: "Select valid EC2/S3 resource types."
+      return redirect_to dashboard_path(environment_id: environment.id), alert: "Select valid EC2/S3 resource types."
     end
 
     scan = ScanCoordinator.new(environment: environment).call(resource_types: types)
@@ -21,7 +22,7 @@ class ScansController < ApplicationController
       "Scan failed. Previously stored resources were preserved."
     end
 
-    redirect_to dashboard_path, notice: message
+    redirect_to dashboard_path(environment_id: environment.id), notice: message
   end
 
   private

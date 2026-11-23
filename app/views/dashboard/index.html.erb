@@ -25,11 +25,8 @@
       </p>
 
       <% if @scan_enabled %>
-        <%= form_with url: environment_scans_path(@connected_environment), method: :post do %>
-          <%= hidden_field_tag "resource_types[]", "ec2" %>
-          <%= hidden_field_tag "resource_types[]", "s3" %>
-          <%= submit_tag "Refresh resources", class: "refresh-button" %>
-        <% end %>
+        <%= render "scan_controls", environment: @connected_environment, environments: @scan_environments %>
+        <%= render "scan_result", scan: @latest_scan %>
       <% end %>
     </div>
 
@@ -43,6 +40,10 @@
         <span>No successful scans yet</span>
       <% end %>
     </div>
+  </section>
+<% elsif @scan_enabled %>
+  <section class="connected-account-card" aria-label="Connected AWS account">
+    <p class="empty-state">No AWS environments are configured.</p>
   </section>
 <% end %>
 
