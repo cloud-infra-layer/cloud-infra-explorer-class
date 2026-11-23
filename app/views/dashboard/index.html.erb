@@ -63,7 +63,7 @@
   </div>
 
   <div class="stat-card">
-    <span class="stat-label">Pinned</span>
+    <%= link_to "Pinned", resources_path(pinned: "1"), class: "stat-label" %>
     <div class="stat-value">
       <span><%= @dashboard_stats[:pinned] %></span>
       <small>/<%= @dashboard_stats[:total_resources] %></small>
@@ -78,6 +78,8 @@
     </div>
   </div>
 </section>
+
+<p class="empty-state">Inventory counts include visible resources only. <%= link_to "View hidden resources", resources_path(visibility: "hidden") %></p>
 
 <div class="category-grid">
   <%= render "home/category_card",

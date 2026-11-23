@@ -8,6 +8,10 @@
         <th scope="col">Region</th>
         <th scope="col">Resource ID</th>
         <th scope="col">Metadata</th>
+        <th scope="col">Status</th>
+        <% if personalization_enabled %>
+          <th scope="col">Actions</th>
+        <% end %>
       </tr>
     </thead>
     <tbody>
@@ -18,6 +22,24 @@
           <td><%= resource.region.presence || "Unknown" %></td>
           <td class="resource-identifier"><%= resource.resource_id %></td>
           <td><%= resource_metadata(resource) %></td>
+          <td><%= resource.hidden? ? "Hidden" : (resource.pinned? ? "Pinned" : "Unpinned") %></td>
+          <% if personalization_enabled %>
+            <td>
+              <div class="resource-actions">
+                <% actions = if resource.hidden?
+                  { "Restore" => restore_resource_path(resource) }
+                else
+                  pin_action = resource.pinned? ? { "Unpin" => unpin_resource_path(resource) } : { "Pin" => pin_resource_path(resource) }
+                  pin_action.merge("Hide" => hide_resource_path(resource))
+                end %>
+                <% actions.each do |label, path| %>
+                  <%= button_to label, path, method: :patch, params: listing_filters,
+                      class: "inventory-button", form: { data: { turbo: false } },
+                      aria: { label: "#{label} #{resource.name} (#{resource.resource_id})" } %>
+                <% end %>
+              </div>
+            </td>
+          <% end %>
         </tr>
       <% end %>
     </tbody>
