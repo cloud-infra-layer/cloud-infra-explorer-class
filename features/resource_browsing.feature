@@ -27,3 +27,15 @@ Feature: Browse cloud infrastructure resources
     And I click the EC2 category
     And I click "Back to dashboard"
     Then I should see the cloud infrastructure dashboard
+
+  Scenario: Search for an existing resource
+    When I visit the resource inventory
+    And I search for "web-server"
+    Then I should see "web-server"
+    And I should not see "assets-bucket"
+
+  Scenario: Search for a resource that does not exist
+    When I visit the resource inventory
+    And I search for "nonexistent-server"
+    Then I should see "No resources match your search"
+    And I should not see "web-server"
