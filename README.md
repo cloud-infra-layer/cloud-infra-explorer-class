@@ -14,12 +14,14 @@ The project is being developed by a four-person team for Columbia University's C
 > The application includes pre-seeded demo resources in PostgreSQL (`Course demo` environment), and all automated test suites (RSpec, Cucumber) use synthetic test databases and mocked AWS SDK responses.
 
 Start with the EC2 or S3 category and search by resource name, service, or AWS ID.
-The public UI currently supports browsing and search. Pin/hide persistence and
-protected actions are implemented in the backend; the buttons and hidden-resource
-navigation are pending frontend integration. Live refresh requires authorized
-application access and configured read-only AWS credentials; it is not required
-to evaluate demo inventory. A stored demo environment is not proof of a connected
-AWS account or a successful live scan.
+The public UI supports browsing, searching, filtering, pinning, unpinning,
+hiding, and restoring stored EC2/S3 resources. Users can access dedicated
+pinned and hidden inventory views. Authorized administrators can select an
+AWS environment, initiate EC2/S3 discovery, and view scan results.
+
+Live refresh requires authorized application access and configured read-only
+AWS credentials; it is not required to evaluate demo inventory. A stored demo
+environment is not proof of a connected AWS account or a successful live scan.
 
 ## Project Overview
 
@@ -28,18 +30,18 @@ The intended workflow is to find a resource, pin it for quick access, hide
 irrelevant inventory, and restore it when needed. These preferences belong to the
 shared team view, not individual user accounts, and do not change resources in AWS.
 
-### Implemented capabilities and remaining integration
+### Implemented capabilities
 
 | Capability | Current status |
 |---|---|
 | Browse stored EC2/S3 inventory and metadata | Available through category listings and dashboard counts |
 | Search by name, service, or AWS resource ID | Implemented with category filtering and a basic search form |
-| Shared pin/unpin and hide/restore | Database state and protected PATCH endpoints implemented; user-facing controls pending |
-| Focus on important inventory | Backend orders pinned resources first and excludes hidden resources from normal listings/counts; pin indicators and prominent access to pinned assets remain frontend work |
-| Find hidden resources | Backend supports `visibility=hidden`; navigation, restoration controls, and preservation of visibility in forms remain frontend work |
+| Shared pin/unpin and hide/restore | Implemented with protected UI controls and persistent shared preferences |
+| Focus on important inventory | Pinned resources appear first, with a dedicated pinned view and dashboard shortcut; hidden resources are excluded from normal listings and counts |
+| Find hidden resources | Dedicated hidden inventory view supports restoring resources without modifying AWS infrastructure |
 | Read-only EC2/S3 discovery | Adapter implemented; live access depends on deployment credentials and permissions |
 | Persist scan results and scan history | ScanCoordinator and ResourceSync implemented, including partial/failure handling |
-| Authorized manual refresh | Guarded endpoint and dashboard form implemented; available when scan configuration is enabled |
+| Authorized manual refresh | Protected dashboard controls support environment and EC2/S3 selection, scan status, and result feedback when scan configuration is enabled |
 
 **Team sandbox region:** `us-east-2` (US East, Ohio), where the team's AWS test sandbox is set up. The adapter scans the region supplied in `connection_context`; it is not restricted to the sandbox region.
 
@@ -61,7 +63,7 @@ See [AWS development setup](docs/aws-setup.md) for authentication, the discovery
 
 | Technology | Purpose |
 |---|---|
-| Ruby 3.3.12 | Programming language |
+| Ruby 3.3.14 | Programming language |
 | Rails 8.1.4 | Web application framework |
 | PostgreSQL 15+ | Relational database |
 | HTML / CSS / JavaScript | Frontend |
@@ -80,7 +82,7 @@ macOS developers can use the same Ruby and Rails commands after installing the e
 Required software:
 
 - Git
-- Ruby 3.3.12
+- Ruby 3.3.14
 - PostgreSQL 15+
 - Bundler
 - Required system libraries for Rails
@@ -110,8 +112,8 @@ Install Ruby using [rbenv](https://github.com/rbenv/rbenv) and its [ruby-build](
 Once rbenv is configured, install the project Ruby version:
 
 ```bash
-rbenv install 3.3.12
-rbenv global 3.3.12
+rbenv install 3.3.14
+rbenv global 3.3.14
 ```
 
 Confirm Ruby is installed:
@@ -120,7 +122,7 @@ Confirm Ruby is installed:
 ruby --version
 ```
 
-Expected version: `3.3.12`.
+Expected version: `3.3.14`.
 
 Install Bundler if it is not already available:
 
@@ -130,9 +132,7 @@ gem install bundler
 
 ### 2. Clone the repository
 
-First, accept your GitHub repository invitation.
-
-Clone the project:
+Clone the public project:
 
 ```bash
 mkdir -p ~/GitHub
@@ -141,8 +141,6 @@ cd ~/GitHub
 git clone https://github.com/cloud-infra-layer/cloud-infra-explorer-class.git
 cd cloud-infra-explorer-class
 ```
-
-Because this is a private repository, you must authenticate using an authorized GitHub account.
 
 For Windows developers using WSL2, keep the project inside the Ubuntu filesystem rather than `/mnt/c/` for better development performance.
 
@@ -246,13 +244,14 @@ bin/rails test
 ```bash
 bundle exec cucumber
 ```
-*(6 acceptance scenarios covering dashboard viewing, service categorization, and empty-state handling across `features/dashboard.feature` and `features/resource_browsing.feature`)*
+*(16 acceptance scenarios covering dashboard browsing, search/filtering, pinning/unpinning, hiding/restoring, successful manual scans, and failed scans that preserve existing inventory.)*
 
 **4. Rails system-test runner**:
 
-The runner is configured in CI, but `test/system/` currently contains no system
-test cases. Existing RSpec feature specs use Capybara RackTest; they do not verify
-JavaScript or visual layout.
+The system-test runner includes a browser-based test for manual scan controls,
+including loading-state feedback and duplicate-submission prevention at desktop
+and mobile viewport sizes. Existing RSpec feature specs use Capybara RackTest
+and do not independently verify JavaScript or visual layout.
 
 ```bash
 bin/rails test:system
@@ -453,15 +452,16 @@ preference, not an access-control boundary.
 The initial Rails application, PostgreSQL configuration, repository, and continuous integration workflow are established.
 
 Implemented: read-only EC2/S3 discovery, scan orchestration and persistence,
-protected manual refresh, stored inventory browsing/search, and shared
-personalization persistence and endpoints. S3 discovery requires the read-only
-policy described in [AWS development setup](docs/aws-setup.md).
+protected manual refresh, resource searching and filtering, shared resource
+pinning and hiding, and user-facing inventory management controls. S3 discovery
+requires the read-only policy described in [AWS development setup](docs/aws-setup.md).
 
-Remaining work: complete the frontend curation workflow described above, extend
-acceptance scenarios to demonstrate that workflow, and verify the expanded RSpec
-suite locally and in CI. The feature table above
-distinguishes implemented backend functionality from the experience available to
-an evaluator; deployment of code does not by itself verify live AWS connectivity.
+The MVP provides a curated AWS inventory dashboard without modifying AWS
+infrastructure. Cucumber acceptance scenarios cover the core workflows,
+including successful and failed scans.
+
+Live AWS connectivity and deployment configuration must be verified separately
+from automated tests, which use mocked discovery responses.
 
 ## Team
 
