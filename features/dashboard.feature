@@ -10,7 +10,8 @@ Feature: Cloud infrastructure dashboard
     And I should see the EC2 and S3 resource categories
 
   Scenario: Viewing stored infrastructure
-    Given the application contains an EC2 instance named "web-server"
+    Given the application has an empty resource inventory
+    And the application contains an EC2 instance named "web-server"
     And the application contains an S3 bucket named "assets-bucket"
     When I visit the dashboard
     Then I should see one resource in each category

@@ -9,7 +9,7 @@ The project is being developed by a four-person team for Columbia University's C
 - **Live SaaS Deployment (Heroku):** https://cloud-infra-explorer-class-8dbdbc772bf8.herokuapp.com/
 - **GitHub Repository:** https://github.com/cloud-infra-layer/cloud-infra-explorer-class
 
-> **Note for Teaching Staff / Graders:**
+> **Note for Teaching Staff:**
 > Evaluating and testing this product does **NOT** require an AWS account or AWS credentials. 
 > The application includes pre-seeded demo resources in PostgreSQL (`Course demo` environment), and all automated test suites (RSpec, Cucumber) use synthetic test databases and mocked AWS SDK responses.
 
@@ -27,9 +27,6 @@ Our MVP focuses on a **shared, curated view of the assets a team uses most**.
 The intended workflow is to find a resource, pin it for quick access, hide
 irrelevant inventory, and restore it when needed. These preferences belong to the
 shared team view, not individual user accounts, and do not change resources in AWS.
-
-This is a focused inventory interface rather than a replacement for AWS resource
-administration.
 
 ### Implemented capabilities and remaining integration
 
@@ -217,10 +214,12 @@ RSpec is the primary testing focus for course evaluation and new regression
 coverage. Existing Minitest tests remain supplementary regression coverage;
 Cucumber describes acceptance scenarios. All suites run without live AWS credentials.
 
-The suites are not yet equivalent: adapter discovery, ScanCoordinator orchestration,
-and the manual scan endpoint currently have Minitest coverage without corresponding
-RSpec suites. Porting those behaviors to RSpec remains testing work; the presence
-of RSpec alone does not imply every feature is covered by it.
+RSpec covers inventory models and services, search and personalization, adapter
+discovery, ScanCoordinator orchestration, and manual scan requests. Adapter specs
+use stubbed SDK clients; coordinator and request specs exercise persistence with
+synthetic discovery responses. The suites are not exactly equivalent, and no
+line-coverage percentage is claimed. See the coverage map and rubric audit in
+[spec/README.md](spec/README.md), and verify results for the submitted commit.
 
 Prepare the test database, then run suites sequentially:
 
@@ -459,8 +458,8 @@ personalization persistence and endpoints. S3 discovery requires the read-only
 policy described in [AWS development setup](docs/aws-setup.md).
 
 Remaining work: complete the frontend curation workflow described above, extend
-acceptance scenarios to demonstrate that workflow, and add RSpec counterparts
-for discovery and scan orchestration/endpoint coverage. The feature table above
+acceptance scenarios to demonstrate that workflow, and verify the expanded RSpec
+suite locally and in CI. The feature table above
 distinguishes implemented backend functionality from the experience available to
 an evaluator; deployment of code does not by itself verify live AWS connectivity.
 
