@@ -26,15 +26,15 @@ class DashboardController < ApplicationController
       ENV["SCAN_ADMIN_USERNAME"].present? &&
       ENV["SCAN_ADMIN_PASSWORD"].present?
 
-    @connected_environment =
-      Environment.where(provider: "aws").find_by(name: "AWS Sandbox") ||
-      Environment.where(provider: "aws").order(:name).first
+    aws_environments = Environment.where(provider: "aws").order(:name, :id)
+    @scan_environments = aws_environments.to_a if @scan_enabled
+    @connected_environment = @scan_environments&.find { |environment| environment.id.to_s == params[:environment_id] } ||
+      aws_environments.find_by(name: "AWS Sandbox") || aws_environments.first
 
-    @last_successful_scan = if @connected_environment
-      Scan.where(
-        environment: @connected_environment,
-        status: "completed"
-      ).order(completed_at: :desc).first
-    end
+    return unless @connected_environment
+
+    scans = @connected_environment.scans
+    @last_successful_scan = scans.where(status: "completed").order(completed_at: :desc).first
+    @latest_scan = scans.order(started_at: :desc, id: :desc).first if @scan_enabled
   end
 end

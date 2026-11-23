@@ -1,0 +1,26 @@
+<%= form_with url: dashboard_path, method: :get, class: "scan-environment-form" do %>
+  <%= label_tag :environment_id, "AWS environment" %>
+  <div class="scan-environment-fields">
+    <%= select_tag :environment_id, options_for_select(
+      environments.map { |item| ["#{item.name} (#{item.region})", item.id] }, environment.id
+    ) %>
+    <%= submit_tag "View environment", class: "refresh-button" %>
+  </div>
+<% end %>
+
+<%= form_with url: environment_scans_path(environment), method: :post, class: "scan-form",
+      data: { turbo: false, controller: "scan-form", action: "submit->scan-form#submit pageshow@window->scan-form#reset" } do %>
+  <%= hidden_field_tag :scan_form, "1" %>
+  <fieldset>
+    <legend>Services to scan</legend>
+    <% Scan::RESOURCE_TYPES.each do |type| %>
+      <label>
+        <%= check_box_tag "resource_types[]", type, true, id: "scan_#{type}",
+              data: { scan_form_target: "service", action: "change->scan-form#reset" } %>
+        <%= type.upcase %>
+      </label>
+    <% end %>
+  </fieldset>
+  <%= button_tag "Refresh resources", class: "refresh-button", data: { scan_form_target: "button" } %>
+  <p role="status" class="scan-feedback" data-scan-form-target="feedback"></p>
+<% end %>

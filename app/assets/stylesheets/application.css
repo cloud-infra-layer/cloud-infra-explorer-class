@@ -283,3 +283,63 @@ p { margin: 0 0 1rem; }
     grid-template-columns: 1fr;
   }
 }
+
+.scan-environment-form label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 0.35rem;
+}
+
+.scan-environment-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.account-details {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.scan-environment-fields select {
+  max-width: 100%;
+  padding: 0.5rem;
+  font: inherit;
+}
+
+.scan-form fieldset {
+  margin: 0.9rem 0 0.7rem;
+  padding: 0;
+  border: 0;
+}
+
+.scan-form legend {
+  font-weight: 600;
+  margin-bottom: 0.3rem;
+}
+
+.scan-form fieldset label {
+  margin-right: 1rem;
+}
+
+.scan-form .refresh-button:disabled {
+  opacity: 0.75;
+  cursor: wait;
+}
+
+.scan-feedback:not(:empty),
+.scan-result {
+  margin-top: 0.75rem;
+  color: #526176;
+  font-size: 0.875rem;
+}
+
+.scan-result p {
+  margin: 0.25rem 0;
+}
+
+.scan-result ul {
+  margin: 0.35rem 0 0;
+  padding-left: 1.25rem;
+}
