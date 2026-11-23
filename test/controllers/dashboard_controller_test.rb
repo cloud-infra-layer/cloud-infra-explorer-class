@@ -159,6 +159,44 @@ class DashboardControllerTest < ActionDispatch::IntegrationTest
     end
   end
 
+  test "dashboard displays accurate infrastructure statistics" do
+  ec2 = resources(:web_server)
+  s3 = resources(:assets_bucket)
+
+  Resource.where.not(id: [ ec2.id, s3.id ]).delete_all
+
+  ec2.update!(pinned: true, hidden: false)
+  s3.update!(pinned: false, hidden: false)
+
+  get dashboard_url
+
+  assert_response :success
+  assert_select ".dashboard-stats .stat-card", count: 4
+
+    assert_select ".stat-card:nth-child(1)" do
+      assert_select ".stat-label", "Active Services"
+      assert_select ".stat-value span", "2"
+      assert_select ".stat-value small", "/240+"
+    end
+
+    assert_select ".stat-card:nth-child(2)" do
+      assert_select ".stat-label", "Total Resources"
+      assert_select ".stat-value span", "2"
+    end
+
+    assert_select ".stat-card:nth-child(3)" do
+      assert_select ".stat-label", "Pinned"
+      assert_select ".stat-value span", "1"
+      assert_select ".stat-value small", "/2"
+    end
+
+    assert_select ".stat-card:nth-child(4)" do
+      assert_select ".stat-label", "Needs Attention"
+      assert_select ".stat-value span", "—"
+      assert_select ".stat-value small", "/2"
+    end
+  end
+
   private
 
   def assert_category_card(service, name, count)

@@ -46,6 +46,39 @@
   </section>
 <% end %>
 
+<section class="dashboard-stats" aria-label="Infrastructure overview">
+  <div class="stat-card">
+    <span class="stat-label">Active Services</span>
+    <div class="stat-value">
+      <span><%= @dashboard_stats[:active_services] %></span>
+      <small>/240+</small>
+    </div>
+  </div>
+
+  <div class="stat-card">
+    <span class="stat-label">Total Resources</span>
+    <div class="stat-value">
+      <span><%= @dashboard_stats[:total_resources] %></span>
+    </div>
+  </div>
+
+  <div class="stat-card">
+    <span class="stat-label">Pinned</span>
+    <div class="stat-value">
+      <span><%= @dashboard_stats[:pinned] %></span>
+      <small>/<%= @dashboard_stats[:total_resources] %></small>
+    </div>
+  </div>
+
+  <div class="stat-card">
+    <span class="stat-label">Needs Attention</span>
+    <div class="stat-value">
+      <span>—</span>
+      <small>/<%= @dashboard_stats[:total_resources] %></small>
+    </div>
+  </div>
+</section>
+
 <div class="category-grid">
   <%= render "home/category_card",
       service: "ec2",
