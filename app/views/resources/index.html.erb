@@ -1,26 +1,54 @@
 <% content_for :title, "#{@page_title} | Cloud Infrastructure Explorer" %>
 <h1><%= @page_title %></h1>
-<p class="page-description">Browse your stored cloud inventory.</p>
-<%= form_with url: resources_path, method: :get do |form| %>
-  <%= form.label :q, "Search resources" %>
-  <%= form.search_field :q, value: @query, placeholder: "Name, service (EC2/S3), or resource ID" %>
-  <%= form.label :service, "Category" %>
-  <%= form.select :service, options_for_select([ [ "All categories", "" ], [ "EC2", "ec2" ], [ "S3", "s3" ] ], @service) %>
-  <%= form.submit "Search" %>
+<p class="page-description">Pins and hidden resources are shared with your team. Visible inventory counts exclude hidden resources.</p>
+<% if flash[:notice].present? %>
+  <p class="inventory-notice" role="status"><%= flash[:notice] %></p>
+<% end %>
+<% unless @personalization_enabled %>
+  <p class="empty-state">Pinning, hiding, and restoring are currently unavailable.</p>
+<% end %>
+
+<% base_filters = @listing_filters.except(:visibility, :pinned) %>
+<% hidden_view = @visibility == "hidden" %>
+<nav class="inventory-views" aria-label="Inventory views">
+  <%= link_to "All visible resources", resources_path(base_filters), aria: { current: hidden_view || @pinned_only ? nil : "page" } %>
+  <%= link_to "Pinned resources", resources_path(base_filters.merge(pinned: "1")), aria: { current: @pinned_only ? "page" : nil } %>
+  <%= link_to "Hidden resources", resources_path(base_filters.merge(visibility: "hidden")), aria: { current: hidden_view ? "page" : nil } %>
+</nav>
+
+<%= form_with url: resources_path, method: :get, class: "inventory-search" do |form| %>
+  <% @listing_filters.slice(:visibility, :pinned).each do |key, value| %>
+    <%= form.hidden_field key, value: value %>
+  <% end %>
+  <div>
+    <%= form.label :q, "Search resources" %>
+    <%= form.search_field :q, value: @query, placeholder: "Name, service (EC2/S3), or resource ID" %>
+  </div>
+  <div>
+    <%= form.label :service, "Category" %>
+    <%= form.select :service, options_for_select([ [ "All categories", "" ], [ "EC2", "ec2" ], [ "S3", "s3" ] ], @service) %>
+  </div>
+  <%= form.submit "Search", class: "inventory-button" %>
   <% if @query.present? %>
-    <%= link_to "Clear search", resources_path(service: @service.presence) %>
+    <%= link_to "Clear search", resources_path(@listing_filters.except(:q)) %>
   <% end %>
 <% end %>
 <section class="content-panel" aria-labelledby="resources-heading">
-  <h2 id="resources-heading">Stored inventory</h2>
+  <% inventory_heading = hidden_view ? "Hidden inventory" : (@pinned_only ? "Pinned inventory" : "Stored inventory") %>
+  <h2 id="resources-heading"><%= inventory_heading %></h2>
   <% if @resources.empty? %>
     <% if @query.present? %>
       <p class="empty-state">No resources match your search in the selected category.</p>
+    <% elsif hidden_view %>
+      <p class="empty-state">No hidden resources in the selected category.</p>
+    <% elsif @pinned_only %>
+      <p class="empty-state">No pinned resources in the selected category.</p>
     <% else %>
       <p class="empty-state">No <%= "#{@service.upcase} " if @service.present? %>resources found.</p>
     <% end %>
   <% else %>
-    <%= render "table", resources: @resources, caption: @page_title %>
+    <%= render "table", resources: @resources, caption: @page_title,
+        personalization_enabled: @personalization_enabled, listing_filters: @listing_filters %>
   <% end %>
   <%= link_to "Back to dashboard", root_path %>
 </section>

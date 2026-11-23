@@ -11,13 +11,19 @@ class ResourcesController < ApplicationController
     return head :bad_request unless visibility.nil? || visibility.is_a?(String)
     @visibility = visibility.presence || "visible"
     return head :bad_request unless %w[visible hidden].include?(@visibility)
+    pinned = params[:pinned]
+    return head :bad_request unless [ nil, "", "1" ].include?(pinned)
 
     @query = query.to_s.strip
     @service = service
+    @pinned_only = @visibility == "visible" && pinned == "1"
+    @listing_filters = listing_filters
+    @personalization_enabled = personalization_enabled?
 
     @page_title = service.present? ? "#{service.upcase} Resources" : "Resources"
     @resources = Resource.where(provider: "aws")
     @resources = @visibility == "hidden" ? @resources.hidden : @resources.visible
+    @resources = @resources.where(pinned: true) if @pinned_only
     @resources = @resources.where(service: service) if service.present?
     @resources = @resources.search(@query).pinned_first
   end
@@ -40,11 +46,13 @@ class ResourcesController < ApplicationController
 
   private
 
+  def personalization_enabled?
+    ENV["ENABLE_RESOURCE_PERSONALIZATION"] == "true" &&
+      ENV["RESOURCE_ADMIN_USERNAME"].present? && ENV["RESOURCE_ADMIN_PASSWORD"].present?
+  end
+
   def require_personalization_access!
-    unless ENV["ENABLE_RESOURCE_PERSONALIZATION"] == "true" &&
-        ENV["RESOURCE_ADMIN_USERNAME"].present? && ENV["RESOURCE_ADMIN_PASSWORD"].present?
-      return head :not_found
-    end
+    return head :not_found unless personalization_enabled?
 
     authenticate_or_request_with_http_basic("Cloud Infrastructure Explorer personalization") do |username, password|
       ActiveSupport::SecurityUtils.secure_compare(username, ENV.fetch("RESOURCE_ADMIN_USERNAME")) &
@@ -56,6 +64,19 @@ class ResourcesController < ApplicationController
     resource = Resource.find(params[:id])
     # Only the action's one field is writable; request attributes are never assigned.
     resource.update!(attribute => value)
-    redirect_to resources_path, status: :see_other, notice: message
+    redirect_to resources_path(listing_filters), status: :see_other, notice: message
+  end
+
+  def listing_filters
+    filters = {}
+    query = params[:q]
+    filters[:q] = query.strip if query.is_a?(String) && query.strip.present?
+    filters[:service] = params[:service] if %w[ec2 s3].include?(params[:service])
+    if params[:visibility] == "hidden"
+      filters[:visibility] = "hidden"
+    elsif [ nil, "", "visible" ].include?(params[:visibility]) && params[:pinned] == "1"
+      filters[:pinned] = "1"
+    end
+    filters
   end
 end

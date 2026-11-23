@@ -11,13 +11,13 @@
           } %>
 
       <%= link_to "EC2 Resources",
-          resources_path(service: "ec2"),
+          resources_path((@listing_filters || {}).merge(service: "ec2")),
           aria: {
             current: controller_name == "resources" && params[:service] == "ec2" ? "page" : nil
           } %>
 
       <%= link_to "S3 Resources",
-          resources_path(service: "s3"),
+          resources_path((@listing_filters || {}).merge(service: "s3")),
           aria: {
             current: controller_name == "resources" && params[:service] == "s3" ? "page" : nil
           } %>

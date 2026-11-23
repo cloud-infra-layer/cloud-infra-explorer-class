@@ -82,7 +82,7 @@ RSpec.describe "Inventory HTTP responses", type: :request do
     document = Nokogiri::HTML(response.body)
     expect(document.css("tbody script")).to be_empty
     expect(document.at_css("tbody th").text).to eq(html)
-    expect(document.css("tbody td").map(&:text)).to eq([ "EC2", html, html, "State: #{html}" ])
+    expect(document.css("tbody td").map(&:text)).to eq([ "EC2", html, html, "State: #{html}", "Unpinned" ])
     expect(response.body).to include("&lt;script&gt;")
   end
 end

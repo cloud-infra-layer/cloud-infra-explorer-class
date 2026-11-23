@@ -83,6 +83,20 @@ RSpec.describe "Protected resource personalization", type: :request do
     expect(resource).to be_pinned
   end
 
+  it "redirects only to a listing with validated filters" do
+    patch hide_resource_path(resource), headers: auth_headers, params: {
+      q: "  server ", service: "ec2", pinned: "1", return_to: "https://example.com"
+    }
+    expect(response).to redirect_to(resources_path(q: "server", service: "ec2", pinned: "1"))
+    expect(resource.reload).to be_hidden
+
+    patch restore_resource_path(resource), headers: auth_headers, params: {
+      q: [ "server" ], service: "unsupported", visibility: { url: "https://example.com" }, pinned: "yes"
+    }
+    expect(response).to redirect_to(resources_path)
+    expect(resource.reload).not_to be_hidden
+  end
+
   it "returns 404 for a missing resource after authentication" do
     patch pin_resource_path(id: 0), headers: auth_headers
     expect(response).to have_http_status(:not_found)
