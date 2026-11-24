@@ -28,14 +28,8 @@ class ScansController < ApplicationController
   private
 
   def require_scan_access!
-    unless ENV["ENABLE_MANUAL_SCANS"] == "true" &&
-        ENV["SCAN_ADMIN_USERNAME"].present? && ENV["SCAN_ADMIN_PASSWORD"].present?
-      return head :not_found
-    end
+    return if ENV["ENABLE_MANUAL_SCANS"] == "true"
 
-    authenticate_or_request_with_http_basic("Cloud Infrastructure Explorer scans") do |username, password|
-      ActiveSupport::SecurityUtils.secure_compare(username, ENV.fetch("SCAN_ADMIN_USERNAME")) &
-        ActiveSupport::SecurityUtils.secure_compare(password, ENV.fetch("SCAN_ADMIN_PASSWORD"))
-    end
+    head :not_found
   end
 end

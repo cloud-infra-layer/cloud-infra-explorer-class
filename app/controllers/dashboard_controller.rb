@@ -22,9 +22,7 @@ class DashboardController < ApplicationController
       pinned: visible_resources.count(&:pinned?)
     }
 
-    @scan_enabled = ENV["ENABLE_MANUAL_SCANS"] == "true" &&
-      ENV["SCAN_ADMIN_USERNAME"].present? &&
-      ENV["SCAN_ADMIN_PASSWORD"].present?
+    @scan_enabled = ENV["ENABLE_MANUAL_SCANS"] == "true"
 
     aws_environments = Environment.where(provider: "aws").order(:name, :id)
     @scan_environments = aws_environments.to_a if @scan_enabled

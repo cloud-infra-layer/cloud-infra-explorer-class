@@ -7,17 +7,16 @@ class ManualScanControlsTest < ActionDispatch::SystemTestCase
   end
 
   setup do
-    @scan_settings = {
-      "ENABLE_MANUAL_SCANS" => "true",
-      "SCAN_ADMIN_USERNAME" => "system-test-admin",
-      "SCAN_ADMIN_PASSWORD" => "system-test-password"
-    }
-    @previous_settings = ENV.to_h.slice(*@scan_settings.keys)
-    ENV.update(@scan_settings)
+    @previous_enable_manual_scans = ENV["ENABLE_MANUAL_SCANS"]
+    ENV["ENABLE_MANUAL_SCANS"] = "true"
   end
 
   teardown do
-    @scan_settings.each_key { |key| ENV[key] = @previous_settings[key] }
+    if @previous_enable_manual_scans.nil?
+      ENV.delete("ENABLE_MANUAL_SCANS")
+    else
+      ENV["ENABLE_MANUAL_SCANS"] = @previous_enable_manual_scans
+    end
   end
 
   test "mobile and desktop controls show loading and prevent duplicate submission" do

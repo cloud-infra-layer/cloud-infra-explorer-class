@@ -16,11 +16,11 @@ The project is being developed by a four-person team for Columbia University's C
 Start with the EC2 or S3 category and search by resource name, service, or AWS ID.
 The public UI supports browsing, searching, filtering, pinning, unpinning,
 hiding, and restoring stored EC2/S3 resources. Users can access dedicated
-pinned and hidden inventory views. Authorized administrators can select an
+pinned and hidden inventory views. When manual scans are enabled, users can select an
 AWS environment, initiate EC2/S3 discovery, and view scan results.
 
-Live refresh requires authorized application access and configured read-only
-AWS credentials; it is not required to evaluate demo inventory. A stored demo
+Live refresh requires `ENABLE_MANUAL_SCANS=true` and configured read-only
+AWS credentials on the host; it is not required to evaluate demo inventory. A stored demo
 environment is not proof of a connected AWS account or a successful live scan.
 
 ## Project Overview
@@ -36,16 +36,16 @@ shared team view, not individual user accounts, and do not change resources in A
 |---|---|
 | Browse stored EC2/S3 inventory and metadata | Available through category listings and dashboard counts |
 | Search by name, service, or AWS resource ID | Implemented with category filtering and a basic search form |
-| Shared pin/unpin and hide/restore | Implemented with protected UI controls and persistent shared preferences |
+| Shared pin/unpin and hide/restore | Implemented with feature-flagged UI controls and persistent shared preferences |
 | Focus on important inventory | Pinned resources appear first, with a dedicated pinned view and dashboard shortcut; hidden resources are excluded from normal listings and counts |
 | Find hidden resources | Dedicated hidden inventory view supports restoring resources without modifying AWS infrastructure |
 | Read-only EC2/S3 discovery | Adapter implemented; live access depends on deployment credentials and permissions |
 | Persist scan results and scan history | ScanCoordinator and ResourceSync implemented, including partial/failure handling |
-| Authorized manual refresh | Protected dashboard controls support environment and EC2/S3 selection, scan status, and result feedback when scan configuration is enabled |
+| Manual refresh | Feature-flagged dashboard controls support environment and EC2/S3 selection, scan status, and result feedback when scan configuration is enabled |
 
 **Team sandbox region:** `us-east-2` (US East, Ohio), where the team's AWS test sandbox is set up. The adapter scans the region supplied in `connection_context`; it is not restricted to the sandbox region.
 
-The application uses a Ruby on Rails monolith with PostgreSQL. An authorized
+The application uses a Ruby on Rails monolith with PostgreSQL. A feature-flagged
 manual refresh follows this implemented flow:
 
 `ScansController → ScanCoordinator → CloudProvider::Adapter → ResourceSync → PostgreSQL`
@@ -436,23 +436,20 @@ The `Course demo` environment uses fictional `us-east-1` resources. It is separa
 The dashboard reads stored records. Running the adapter or
 `script/verify_resources.rb` alone returns discovery results without saving them;
 the implemented ScanCoordinator workflow persists both inventory and scan history.
-Refreshing requires `ENABLE_MANUAL_SCANS=true`, `SCAN_ADMIN_USERNAME`,
-`SCAN_ADMIN_PASSWORD`, and an appropriately configured AWS credential source.
-
-Shared personalization writes are independently guarded by
-`ENABLE_RESOURCE_PERSONALIZATION=true`, `RESOURCE_ADMIN_USERNAME`, and
-`RESOURCE_ADMIN_PASSWORD`. Missing configuration disables the endpoints; enabled
-writes require HTTP Basic authentication and Rails CSRF protection. Configure
-credentials as runtime secrets and use HTTPS in deployment. No AWS credentials are
-needed to personalize stored demo inventory. Hidden state is a presentation
-preference, not an access-control boundary.
+Refreshing requires `ENABLE_MANUAL_SCANS=true` and an appropriately configured AWS
+credential source on the application host. Shared personalization writes require
+`ENABLE_RESOURCE_PERSONALIZATION=true`. Missing flags disable those endpoints.
+Rails CSRF protection remains enabled on write forms. Iteration 2 intentionally
+omits end-user login; pin/hide and scans are feature-flagged for the shared demo.
+No AWS credentials are needed to personalize stored demo inventory. Hidden state
+is a presentation preference, not an access-control boundary.
 
 ## Development Status
 
 The initial Rails application, PostgreSQL configuration, repository, and continuous integration workflow are established.
 
 Implemented: read-only EC2/S3 discovery, scan orchestration and persistence,
-protected manual refresh, resource searching and filtering, shared resource
+feature-flagged manual refresh, resource searching and filtering, shared resource
 pinning and hiding, and user-facing inventory management controls. S3 discovery
 requires the read-only policy described in [AWS development setup](docs/aws-setup.md).
 

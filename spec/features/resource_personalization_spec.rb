@@ -2,16 +2,11 @@ require "rails_helper"
 
 RSpec.describe "Managing the shared inventory", type: :feature do
   around do |example|
-    settings = {
-      "ENABLE_RESOURCE_PERSONALIZATION" => "true",
-      "RESOURCE_ADMIN_USERNAME" => "test-editor",
-      "RESOURCE_ADMIN_PASSWORD" => "test-password"
-    }
-    original = ENV.to_h.slice(*settings.keys)
-    ENV.update(settings)
+    original = ENV["ENABLE_RESOURCE_PERSONALIZATION"]
+    ENV["ENABLE_RESOURCE_PERSONALIZATION"] = "true"
     example.run
   ensure
-    settings.each_key { |key| ENV[key] = original[key] }
+    original.nil? ? ENV.delete("ENABLE_RESOURCE_PERSONALIZATION") : ENV["ENABLE_RESOURCE_PERSONALIZATION"] = original
   end
 
   before do
@@ -25,7 +20,6 @@ RSpec.describe "Managing the shared inventory", type: :feature do
   end
 
   it "pins, hides, restores, and unpins while retaining search and category context" do
-    page.driver.header("Authorization", ActionController::HttpAuthentication::Basic.encode_credentials("test-editor", "test-password"))
     visit resources_path(service: "ec2", q: "team")
 
     expect(page).to have_css("tbody", text: "Unpinned")

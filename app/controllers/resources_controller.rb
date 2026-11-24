@@ -47,17 +47,13 @@ class ResourcesController < ApplicationController
   private
 
   def personalization_enabled?
-    ENV["ENABLE_RESOURCE_PERSONALIZATION"] == "true" &&
-      ENV["RESOURCE_ADMIN_USERNAME"].present? && ENV["RESOURCE_ADMIN_PASSWORD"].present?
+    ENV["ENABLE_RESOURCE_PERSONALIZATION"] == "true"
   end
 
   def require_personalization_access!
-    return head :not_found unless personalization_enabled?
+    return if personalization_enabled?
 
-    authenticate_or_request_with_http_basic("Cloud Infrastructure Explorer personalization") do |username, password|
-      ActiveSupport::SecurityUtils.secure_compare(username, ENV.fetch("RESOURCE_ADMIN_USERNAME")) &
-        ActiveSupport::SecurityUtils.secure_compare(password, ENV.fetch("RESOURCE_ADMIN_PASSWORD"))
-    end
+    head :not_found
   end
 
   def update_personalization(attribute, value, message)

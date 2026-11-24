@@ -3,7 +3,6 @@ require "rails_helper"
 RSpec.describe "Manual scans", type: :request do
   let(:environment) { Environment.create!(name: "Scan request specs", provider: "aws", region: "us-east-2") }
   let(:path) { environment_scans_path(environment) }
-  let(:headers) { { "Authorization" => ActionController::HttpAuthentication::Basic.encode_credentials("scan-tester", "test-password") } }
   let(:record) do
     { provider: "aws", service: "ec2", resource_id: "i-request-scan", name: "Request server",
       region: environment.region, metadata: { state: "running" }, console_url: nil }
@@ -12,14 +11,11 @@ RSpec.describe "Manual scans", type: :request do
   let(:adapter) { instance_double(CloudProvider::Adapter, list_resources: result) }
 
   around do |example|
-    keys = %w[ENABLE_MANUAL_SCANS SCAN_ADMIN_USERNAME SCAN_ADMIN_PASSWORD]
-    original = keys.to_h { |key| [ key, ENV[key] ] }
+    original = ENV["ENABLE_MANUAL_SCANS"]
     ENV["ENABLE_MANUAL_SCANS"] = "true"
-    ENV["SCAN_ADMIN_USERNAME"] = "scan-tester"
-    ENV["SCAN_ADMIN_PASSWORD"] = "test-password"
     example.run
   ensure
-    original.each { |key, value| value.nil? ? ENV.delete(key) : ENV[key] = value }
+    original.nil? ? ENV.delete("ENABLE_MANUAL_SCANS") : ENV["ENABLE_MANUAL_SCANS"] = original
   end
 
   before do
@@ -28,23 +24,11 @@ RSpec.describe "Manual scans", type: :request do
     allow(CloudProvider::Adapter).to receive(:new).and_return(adapter)
   end
 
-  %w[ENABLE_MANUAL_SCANS SCAN_ADMIN_USERNAME SCAN_ADMIN_PASSWORD].each do |key|
-    it "disables scans when #{key} is missing" do
-      ENV.delete(key)
-      expect(adapter).not_to receive(:list_resources)
-      post path, headers: headers
-      expect(response).to have_http_status(:not_found)
-      expect(environment.scans).to be_empty
-    end
-  end
-
-  it "rejects missing and incorrect credentials without creating scans" do
+  it "disables scans when ENABLE_MANUAL_SCANS is missing" do
+    ENV.delete("ENABLE_MANUAL_SCANS")
     expect(adapter).not_to receive(:list_resources)
-    [ {}, { "Authorization" => ActionController::HttpAuthentication::Basic.encode_credentials("scan-tester", "wrong") } ].each do |auth|
-      post path, headers: auth
-      expect(response).to have_http_status(:unauthorized)
-      expect(response.headers["WWW-Authenticate"]).to include("Basic")
-    end
+    post path
+    expect(response).to have_http_status(:not_found)
     expect(environment.scans).to be_empty
   end
 
@@ -53,7 +37,7 @@ RSpec.describe "Manual scans", type: :request do
       expect(adapter).not_to receive(:list_resources)
       # JSON preserves an explicit empty array; form encoding can omit it and
       # accidentally exercise the controller's default-types behavior instead.
-      post path, headers: headers, params: { resource_types: types }, as: :json
+      post path, params: { resource_types: types }, as: :json
       expect(response).to redirect_to(dashboard_path(environment_id: environment.id))
       expect(flash[:alert]).to eq("Select valid EC2/S3 resource types.")
       expect(environment.scans).to be_empty
@@ -62,7 +46,7 @@ RSpec.describe "Manual scans", type: :request do
 
   it "persists a default two-service scan and shows success feedback after redirect" do
     expect(adapter).to receive(:list_resources).with(provider: "aws", region: environment.region, resource_types: %w[ec2 s3]).and_return(result)
-    post path, headers: headers
+    post path
     expect(response).to redirect_to(dashboard_path(environment_id: environment.id))
     expect(environment.scans.sole).to have_attributes(status: "completed", created_count: 1, discovered_count: 1)
     expect(environment.resources.sole.name).to eq("Request server")
@@ -75,7 +59,7 @@ RSpec.describe "Manual scans", type: :request do
     it "passes the dashboard selection #{types.join(' and ')} to discovery and shows an empty result" do
       expect(adapter).to receive(:list_resources).with(provider: "aws", region: environment.region, resource_types: types)
         .and_return(resources: [], errors: [])
-      post path, headers: headers, params: { scan_form: "1", resource_types: types }
+      post path, params: { scan_form: "1", resource_types: types }
       expect(environment.scans.sole.resource_types).to eq(types)
 
       follow_redirect!
@@ -87,7 +71,7 @@ RSpec.describe "Manual scans", type: :request do
 
   it "rejects a dashboard form with neither service selected" do
     expect(adapter).not_to receive(:list_resources)
-    post path, headers: headers, params: { scan_form: "1" }
+    post path, params: { scan_form: "1" }
     expect(response).to redirect_to(dashboard_path(environment_id: environment.id))
     expect(flash[:alert]).to eq("Select valid EC2/S3 resource types.")
     expect(environment.scans).to be_empty
@@ -97,7 +81,7 @@ RSpec.describe "Manual scans", type: :request do
     existing = environment.resources.create!(record.merge(pinned: true, hidden: true))
     original = existing.attributes
     allow(adapter).to receive(:list_resources).and_return(resources: [], errors: [ { resource_type: "ec2", code: "aws_api_error", message: "EC2 unavailable." } ])
-    post path, headers: headers
+    post path
     expect(response).to redirect_to(dashboard_path(environment_id: environment.id))
     expect(environment.scans.sole.status).to eq("partial")
     expect(flash[:notice]).to include("Scan partially completed")
@@ -106,7 +90,7 @@ RSpec.describe "Manual scans", type: :request do
 
   it "shows safe failure feedback when discovery raises" do
     allow(adapter).to receive(:list_resources).and_raise(StandardError, "private-sdk-value")
-    post path, headers: headers
+    post path
     expect(response).to redirect_to(dashboard_path(environment_id: environment.id))
     expect(environment.scans.sole.status).to eq("failed")
     expect(flash[:notice]).to eq("Scan failed. Previously stored resources were preserved.")
@@ -119,13 +103,13 @@ RSpec.describe "Manual scans", type: :request do
 
   it "returns 404 for an unknown environment without discovery" do
     expect(adapter).not_to receive(:list_resources)
-    post environment_scans_path(environment_id: 0), headers: headers
+    post environment_scans_path(environment_id: 0)
     expect(response).to have_http_status(:not_found)
   end
 
   it "does not allow GET to initiate a scan" do
     expect(adapter).not_to receive(:list_resources)
-    get path, headers: headers
+    get path
     expect(response).to have_http_status(:not_found)
     expect(environment.scans).to be_empty
   end
@@ -134,7 +118,7 @@ RSpec.describe "Manual scans", type: :request do
     previous = ActionController::Base.allow_forgery_protection
     ActionController::Base.allow_forgery_protection = true
     expect(adapter).not_to receive(:list_resources)
-    post path, headers: headers
+    post path
     expect(response).to have_http_status(422)
     expect(environment.scans).to be_empty
   ensure
@@ -148,8 +132,7 @@ RSpec.describe "Manual scans", type: :request do
     form = Nokogiri::HTML(response.body).at_css("form.scan-form")
     token = form.at_css("input[name=authenticity_token]")["value"]
 
-    post form["action"], headers: headers,
-      params: { authenticity_token: token, scan_form: "1", resource_types: %w[ec2] }
+    post form["action"], params: { authenticity_token: token, scan_form: "1", resource_types: %w[ec2] }
 
     expect(response).to redirect_to(dashboard_path(environment_id: environment.id))
     expect(environment.scans.sole.status).to eq("completed")
