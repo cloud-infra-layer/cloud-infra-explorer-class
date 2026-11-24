@@ -61,7 +61,7 @@ RSpec.describe "Inventory HTTP responses", type: :request do
     expect(response).to have_http_status(:ok)
     document = Nokogiri::HTML(response.body)
     expect(document.css("main script")).to be_empty
-    expect(document.at_css(".connected-account-card h2").text).to eq(html)
+    expect(document.at_css(".environment-card h2").text).to eq(html)
     expect(response.body).to include("&lt;script&gt;")
 
     get resources_path, params: { service: "ec2" }
@@ -82,7 +82,23 @@ RSpec.describe "Inventory HTTP responses", type: :request do
     document = Nokogiri::HTML(response.body)
     expect(document.css("tbody script")).to be_empty
     expect(document.at_css("tbody th").text).to eq(html)
-    expect(document.css("tbody td").map(&:text)).to eq([ "EC2", html, html, "State: #{html}", "Unpinned" ])
+    expect(document.css("tbody td").map(&:text)).to eq([ "Compute", html, html, "State: #{html}", "Unpinned" ])
     expect(response.body).to include("&lt;script&gt;")
   end
+  it "serves a resource detail page with console handoff" do
+    instance.update!(
+      console_url: "https://console.aws.amazon.com/ec2/home#InstanceDetails:instanceId=i-request-web",
+      metadata: { instance_type: "t3.micro", state: "running" }
+    )
+
+    get resource_path(instance)
+
+    expect(response).to have_http_status(:ok)
+    document = Nokogiri::HTML(response.body)
+    expect(document.at_css("h1").text).to eq("Request web server")
+    expect(document.at_css(".resource-detail-eyebrow").text).to eq("Compute")
+    expect(document.at_css("a.resource-console-link")["href"]).to include("console.aws.amazon.com")
+    expect(document.at_css("a.resource-console-link").text).to eq("Open in AWS")
+  end
+
 end

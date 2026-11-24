@@ -11,19 +11,27 @@ Feature: Browse cloud infrastructure resources
   Scenario: Browse EC2 resources from the dashboard
     When I visit the dashboard
     And I click the EC2 category
-    Then I should see "EC2 Resources"
+    Then I should see "Compute"
     And I should see "web-server"
     And I should not see "assets-bucket"
 
   Scenario: Browse S3 resources from the dashboard
     When I visit the dashboard
     And I click the S3 category
-    Then I should see "S3 Resources"
+    Then I should see "Storage"
     And I should see "assets-bucket"
     And I should not see "web-server"
 
   Scenario: Return to the dashboard
     When I visit the dashboard
     And I click the EC2 category
-    And I click "Back to dashboard"
+    And I click "Back to overview"
     Then I should see the cloud infrastructure dashboard
+
+  Scenario: Open a resource detail page from a category listing
+    When I visit the dashboard
+    And I click the EC2 category
+    And I click "web-server"
+    Then I should see "web-server"
+    And I should see "Compute"
+    And I should see "Back to overview"

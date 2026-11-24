@@ -2,6 +2,6 @@
 <h1>Dashboard</h1>
 <p class="page-description">Explore your cloud infrastructure in one place.</p>
 <div class="category-grid">
-  <%= render "category_card", service: "ec2", name: "EC2 Instances", count: @resource_counts.fetch("ec2", 0) %>
-  <%= render "category_card", service: "s3", name: "S3 Buckets", count: @resource_counts.fetch("s3", 0) %>
+  <%= render "category_card", service: "ec2", name: "Compute", count: @resource_counts.fetch("ec2", 0) %>
+  <%= render "category_card", service: "s3", name: "Storage", count: @resource_counts.fetch("s3", 0) %>
 </div>

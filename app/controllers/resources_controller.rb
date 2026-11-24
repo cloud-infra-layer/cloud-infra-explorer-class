@@ -20,12 +20,26 @@ class ResourcesController < ApplicationController
     @listing_filters = listing_filters
     @personalization_enabled = personalization_enabled?
 
-    @page_title = service.present? ? "#{service.upcase} Resources" : "Resources"
+    @page_title = if service.present?
+      helpers.category_label(service)
+    elsif @pinned_only
+      "Pinned"
+    elsif @visibility == "hidden"
+      "Hidden"
+    else
+      "Resources"
+    end
     @resources = Resource.where(provider: "aws")
     @resources = @visibility == "hidden" ? @resources.hidden : @resources.visible
     @resources = @resources.where(pinned: true) if @pinned_only
     @resources = @resources.where(service: service) if service.present?
     @resources = @resources.search(@query).pinned_first
+  end
+
+  def show
+    @resource = Resource.includes(:environment).find(params[:id])
+    @personalization_enabled = personalization_enabled?
+    @listing_filters = listing_filters
   end
 
   def pin

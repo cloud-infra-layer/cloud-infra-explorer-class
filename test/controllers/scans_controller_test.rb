@@ -100,7 +100,7 @@ class ScansControllerTest < ActionDispatch::IntegrationTest
 
     get dashboard_path
     assert_response :success
-    assert_select ".connected-account-card", count: 1 do
+    assert_select ".environment-card", count: 1 do
       assert_select "h2", text: "AWS Sandbox"
       assert_select "form[action=?]", environment_scans_path(selected), count: 1
       assert_select "time[datetime]", count: 1 do |nodes|
@@ -147,7 +147,7 @@ class ScansControllerTest < ActionDispatch::IntegrationTest
 
     get dashboard_path
 
-    assert_select ".connected-account-card .empty-state", "No AWS environments are configured."
+    assert_select ".environment-card .empty-state", "No AWS environments are configured."
     assert_select "form[action*='/scans']", count: 0
     assert_select ".category-grid .category-card", count: 2
   end

@@ -1,0 +1,72 @@
+<% content_for :title, "#{@resource.name} | Cloud Infrastructure Explorer" %>
+
+<article class="resource-detail content-panel" aria-labelledby="resource-detail-heading">
+  <header class="resource-detail-header">
+    <div>
+      <p class="resource-detail-eyebrow"><%= category_label(@resource.service) %></p>
+      <h1 id="resource-detail-heading"><%= @resource.name %></h1>
+      <p class="page-description">
+        <%= @resource.region.presence || "Region not specified" %>
+        · <%= @resource.resource_id %>
+        · <%= resource_status_label(@resource) %>
+      </p>
+    </div>
+    <% if @resource.console_url.present? %>
+      <%= link_to "Open in AWS", @resource.console_url, class: "inventory-button resource-console-link",
+            target: "_blank", rel: "noopener noreferrer" %>
+    <% end %>
+  </header>
+
+  <% if flash[:notice].present? %>
+    <p class="inventory-notice" role="status"><%= flash[:notice] %></p>
+  <% end %>
+
+  <dl class="resource-detail-list">
+    <div>
+      <dt>Environment</dt>
+      <dd><%= @resource.environment.name %></dd>
+    </div>
+    <div>
+      <dt>Provider</dt>
+      <dd><%= @resource.provider.upcase %></dd>
+    </div>
+    <div>
+      <dt>Category</dt>
+      <dd><%= category_label(@resource.service) %> (<%= @resource.service.upcase %>)</dd>
+    </div>
+    <div>
+      <dt>Region</dt>
+      <dd><%= @resource.region.presence || "Not specified" %></dd>
+    </div>
+    <div>
+      <dt>Resource ID</dt>
+      <dd class="resource-identifier"><%= @resource.resource_id %></dd>
+    </div>
+    <div>
+      <dt>Metadata</dt>
+      <dd><%= resource_metadata(@resource) %></dd>
+    </div>
+  </dl>
+
+  <% if @personalization_enabled %>
+    <div class="resource-actions">
+      <% actions = if @resource.hidden?
+        { "Restore" => restore_resource_path(@resource) }
+      else
+        pin_action = @resource.pinned? ? { "Unpin" => unpin_resource_path(@resource) } : { "Pin" => pin_resource_path(@resource) }
+        pin_action.merge("Hide" => hide_resource_path(@resource))
+      end %>
+      <% actions.each do |label, path| %>
+        <%= button_to label, path, method: :patch, params: { service: @resource.service },
+            class: "inventory-button", form: { data: { turbo: false } },
+            aria: { label: "#{label} #{@resource.name}" } %>
+      <% end %>
+    </div>
+  <% end %>
+
+  <p class="resource-detail-nav">
+    <%= link_to "Back to #{category_label(@resource.service)}", resources_path(service: @resource.service) %>
+    ·
+    <%= link_to "Back to overview", root_path %>
+  </p>
+</article>

@@ -174,7 +174,7 @@ RSpec.describe "Manual scans", type: :request do
     get dashboard_path
     document = Nokogiri::HTML(response.body)
     expect(document.css("form[action='#{environment_scans_path(selected)}']").size).to eq(1)
-    expect(Time.iso8601(document.at_css(".connected-account-card time")["datetime"]).to_i).to eq(completed_at.to_i)
+    expect(Time.iso8601(document.at_css(".environment-card time")["datetime"]).to_i).to eq(completed_at.to_i)
     ENV["ENABLE_MANUAL_SCANS"] = "false"
     get dashboard_path
     expect(Nokogiri::HTML(response.body).css("form[action$='/scans']")).to be_empty

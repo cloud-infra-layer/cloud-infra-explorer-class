@@ -15,7 +15,7 @@ RSpec.describe "Searching stored resources", type: :feature do
     fill_in "Search resources", with: "WEB"
     click_button "Search"
     expect(page).to have_field("Search resources", with: "WEB")
-    expect(page).to have_select("Category", selected: "EC2")
+    expect(page).to have_select("Category", selected: "Compute")
     within("tbody") do
       expect(page).to have_text("Web server")
       expect(page).not_to have_text("Web assets")
@@ -28,7 +28,7 @@ RSpec.describe "Searching stored resources", type: :feature do
 
     click_link "Clear search"
     expect(page).to have_field("Search resources", with: "")
-    expect(page).to have_select("Category", selected: "EC2")
+    expect(page).to have_select("Category", selected: "Compute")
     expect(page).to have_css("tbody tr", count: 1)
 
     select "All categories", from: "Category"

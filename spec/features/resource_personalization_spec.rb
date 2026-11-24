@@ -32,14 +32,14 @@ RSpec.describe "Managing the shared inventory", type: :feature do
     find_button("Pin", exact: true).click
     expect(page).to have_css('[role="status"]', text: "Resource pinned for the team.")
     expect(page).to have_field("Search resources", with: "team")
-    expect(page).to have_select("Category", selected: "EC2")
+    expect(page).to have_select("Category", selected: "Compute")
 
     click_link "Pinned resources"
     expect(page).to have_css("tbody", text: "Team web server")
     fill_in "Search resources", with: "web"
     click_button "Search"
     expect(page).to have_css('.inventory-views a[aria-current="page"]', text: "Pinned resources")
-    expect(page).to have_select("Category", selected: "EC2")
+    expect(page).to have_select("Category", selected: "Compute")
 
     find_button("Hide", exact: true).click
     expect(page).to have_css('[role="status"]', text: "Resource hidden")
@@ -57,7 +57,7 @@ RSpec.describe "Managing the shared inventory", type: :feature do
     fill_in "Search resources", with: "web"
     click_button "Search"
     expect(page).to have_css('.inventory-views a[aria-current="page"]', text: "Hidden resources")
-    expect(page).to have_select("Category", selected: "EC2")
+    expect(page).to have_select("Category", selected: "Compute")
     expect(page).not_to have_css("tbody", text: "Team database")
 
     find_button("Restore", exact: true).click
@@ -74,7 +74,7 @@ RSpec.describe "Managing the shared inventory", type: :feature do
     visit current_url
     expect(page).to have_css("tbody", text: "Unpinned")
     expect(page).to have_field("Search resources", with: "web")
-    expect(page).to have_select("Category", selected: "EC2")
+    expect(page).to have_select("Category", selected: "Compute")
   end
 
   it "shows empty pinned and hidden views and retains the view when switching categories" do
@@ -83,7 +83,8 @@ RSpec.describe "Managing the shared inventory", type: :feature do
     expect(page).to have_text("No pinned resources")
     click_link "Hidden resources"
     expect(page).to have_css("tbody", text: "Team database")
-    click_link "S3 Resources"
+    select "Storage", from: "Category"
+    click_button "Search"
     expect(page).to have_text("No hidden resources")
     expect(page).to have_css('.inventory-views a[aria-current="page"]', text: "Hidden resources")
   end

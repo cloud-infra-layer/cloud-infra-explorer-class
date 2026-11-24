@@ -8,9 +8,9 @@ class DashboardControllerTest < ActionDispatch::IntegrationTest
 
       assert_response :success
       assert_select "h1", "Cloud Infrastructure Explorer"
-      assert_select ".connected-account-card", count: 1
-      assert_category_card "ec2", "EC2 Instances", 1
-      assert_category_card "s3", "S3 Buckets", 1
+      assert_select ".environment-card", count: 1
+      assert_category_card "ec2", "Compute", 1
+      assert_category_card "s3", "Storage", 1
       assert_select "section#ec2-resources", count: 0
       assert_select "section#s3-resources", count: 0
     end
@@ -20,8 +20,8 @@ class DashboardControllerTest < ActionDispatch::IntegrationTest
     get dashboard_url
 
     assert_response :success
-    assert_category_card "ec2", "EC2 Instances", 1
-    assert_category_card "s3", "S3 Buckets", 1
+    assert_category_card "ec2", "Compute", 1
+    assert_category_card "s3", "Storage", 1
     assert_select ".category-grid table", count: 0
   end
 
@@ -34,8 +34,8 @@ class DashboardControllerTest < ActionDispatch::IntegrationTest
     get dashboard_url
 
     assert_response :success
-    assert_category_card "ec2", "EC2 Instances", 2
-    assert_category_card "s3", "S3 Buckets", 1
+    assert_category_card "ec2", "Compute", 2
+    assert_category_card "s3", "Storage", 1
   end
 
   test "empty S3 category remains visible alongside EC2" do
@@ -44,8 +44,8 @@ class DashboardControllerTest < ActionDispatch::IntegrationTest
     get dashboard_url
 
     assert_response :success
-    assert_category_card "s3", "S3 Buckets", 0
-    assert_category_card "ec2", "EC2 Instances", 1
+    assert_category_card "s3", "Storage", 0
+    assert_category_card "ec2", "Compute", 1
     assert_select ".category-card .category-description", text: "No stored resources yet.", count: 1
   end
 
@@ -55,8 +55,8 @@ class DashboardControllerTest < ActionDispatch::IntegrationTest
     get root_url
 
     assert_response :success
-    assert_category_card "ec2", "EC2 Instances", 0
-    assert_category_card "s3", "S3 Buckets", 0
+    assert_category_card "ec2", "Compute", 0
+    assert_category_card "s3", "Storage", 0
     assert_select ".category-card .category-description", text: "No stored resources yet.", count: 2
     assert_select ".category-grid table", count: 0
   end
@@ -80,10 +80,10 @@ class DashboardControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_select ".category-card", count: 2
 
-    assert_category_card "ec2", "EC2 Instances",
+    assert_category_card "ec2", "Compute",
       Resource.where(provider: "aws", service: "ec2").count
 
-    assert_category_card "s3", "S3 Buckets",
+    assert_category_card "s3", "Storage",
       Resource.where(provider: "aws", service: "s3").count
   end
 
@@ -96,10 +96,10 @@ class DashboardControllerTest < ActionDispatch::IntegrationTest
 
     assert_response :success
 
-    assert_category_card "ec2", "EC2 Instances",
+    assert_category_card "ec2", "Compute",
       Resource.where(provider: "aws", service: "ec2").count
 
-    assert_category_card "s3", "S3 Buckets",
+    assert_category_card "s3", "Storage",
       Resource.where(provider: "aws", service: "s3").count
   end
 
@@ -110,9 +110,9 @@ class DashboardControllerTest < ActionDispatch::IntegrationTest
 
     assert_response :success
 
-    assert_category_card "ec2", "EC2 Instances", 0
+    assert_category_card "ec2", "Compute", 0
 
-    assert_category_card "s3", "S3 Buckets",
+    assert_category_card "s3", "Storage",
       Resource.where(provider: "aws", service: "s3").count
 
     assert_select ".category-card .category-description",
@@ -127,8 +127,8 @@ class DashboardControllerTest < ActionDispatch::IntegrationTest
 
     assert_response :success
 
-    assert_category_card "ec2", "EC2 Instances", 0
-    assert_category_card "s3", "S3 Buckets", 0
+    assert_category_card "ec2", "Compute", 0
+    assert_category_card "s3", "Storage", 0
 
     assert_select ".category-card .category-description",
       text: "No stored resources yet.",
@@ -159,42 +159,27 @@ class DashboardControllerTest < ActionDispatch::IntegrationTest
     end
   end
 
-  test "dashboard displays accurate infrastructure statistics" do
-  ec2 = resources(:web_server)
-  s3 = resources(:assets_bucket)
+  test "dashboard shows pinned strip and last successful scan placeholder" do
+    ec2 = resources(:web_server)
+    s3 = resources(:assets_bucket)
 
-  Resource.where.not(id: [ ec2.id, s3.id ]).delete_all
+    Resource.where.not(id: [ ec2.id, s3.id ]).delete_all
 
-  ec2.update!(pinned: true, hidden: false)
-  s3.update!(pinned: false, hidden: false)
+    ec2.update!(pinned: true, hidden: false)
+    s3.update!(pinned: false, hidden: false)
 
-  get dashboard_url
+    get dashboard_url
 
-  assert_response :success
-  assert_select ".dashboard-stats .stat-card", count: 4
-
-    assert_select ".stat-card:nth-child(1)" do
-      assert_select ".stat-label", "Active Services"
-      assert_select ".stat-value span", "2"
-      assert_select ".stat-value small", "/240+"
+    assert_response :success
+    assert_select ".dashboard-stats", count: 0
+    assert_select ".pinned-strip" do
+      assert_select "h2", "Pinned"
+      assert_select "a.pinned-chip[href=?]", resource_path(ec2), text: ec2.name
+      assert_select "a.pinned-chip", text: s3.name, count: 0
+      assert_select "a[href=?]", resources_path(pinned: "1"), text: "View all pinned"
     end
-
-    assert_select ".stat-card:nth-child(2)" do
-      assert_select ".stat-label", "Total Resources"
-      assert_select ".stat-value span", "2"
-    end
-
-    assert_select ".stat-card:nth-child(3)" do
-      assert_select ".stat-label", "Pinned"
-      assert_select ".stat-value span", "1"
-      assert_select ".stat-value small", "/2"
-    end
-
-    assert_select ".stat-card:nth-child(4)" do
-      assert_select ".stat-label", "Needs Attention"
-      assert_select ".stat-value span", "—"
-      assert_select ".stat-value small", "/2"
-    end
+    assert_select ".environment-card .update-label", "Last successful scan"
+    assert_select ".environment-card", text: /—/
   end
 
   private

@@ -13,15 +13,18 @@ The project is being developed by a four-person team for Columbia University's C
 > Evaluating and testing this product does **NOT** require an AWS account or AWS credentials. 
 > The application includes pre-seeded demo resources in PostgreSQL (`Course demo` environment), and all automated test suites (RSpec, Cucumber) use synthetic test databases and mocked AWS SDK responses.
 
-Start with the EC2 or S3 category and search by resource name, service, or AWS ID.
-The public UI supports browsing, searching, filtering, pinning, unpinning,
-hiding, and restoring stored EC2/S3 resources. Users can access dedicated
-pinned and hidden inventory views. Authorized administrators can select an
-AWS environment, initiate EC2/S3 discovery, and view scan results.
+Start on Overview, open the Compute or Storage category, then open a resource
+detail page for metadata and an **Open in AWS** console handoff when a console
+URL is stored. Search by resource name, service, or AWS ID. The public UI also
+supports pinning, unpinning, hiding, and restoring stored EC2/S3 resources, plus
+dedicated pinned and hidden inventory views. When scans are enabled, authorized
+operators can select an AWS environment, initiate EC2/S3 discovery, and view
+scan results.
 
-Live refresh requires authorized application access and configured read-only
-AWS credentials; it is not required to evaluate demo inventory. A stored demo
-environment is not proof of a connected AWS account or a successful live scan.
+Live refresh requires configured read-only AWS credentials and scan flags; it is
+not required to evaluate demo inventory. A stored demo environment is not proof
+of a connected AWS account or a successful live scan. Overview shows
+**Last successful scan: —** until a completed scan exists.
 
 ## Project Overview
 
@@ -34,14 +37,15 @@ shared team view, not individual user accounts, and do not change resources in A
 
 | Capability | Current status |
 |---|---|
-| Browse stored EC2/S3 inventory and metadata | Available through category listings and dashboard counts |
+| Overview → category → detail flow | Overview with Compute/Storage cards and pinned strip; category listings; resource detail with Open in AWS |
+| Browse stored EC2/S3 inventory and metadata | Available through Compute/Storage listings and overview counts |
 | Search by name, service, or AWS resource ID | Implemented with category filtering and a basic search form |
 | Shared pin/unpin and hide/restore | Implemented with protected UI controls and persistent shared preferences |
-| Focus on important inventory | Pinned resources appear first, with a dedicated pinned view and dashboard shortcut; hidden resources are excluded from normal listings and counts |
+| Focus on important inventory | Pinned strip on overview, pinned-first listings, and a dedicated pinned view; hidden resources are excluded from normal listings and counts |
 | Find hidden resources | Dedicated hidden inventory view supports restoring resources without modifying AWS infrastructure |
 | Read-only EC2/S3 discovery | Adapter implemented; live access depends on deployment credentials and permissions |
 | Persist scan results and scan history | ScanCoordinator and ResourceSync implemented, including partial/failure handling |
-| Authorized manual refresh | Protected dashboard controls support environment and EC2/S3 selection, scan status, and result feedback when scan configuration is enabled |
+| Authorized manual refresh | Protected overview controls support environment and EC2/S3 selection, scan status, and result feedback when scan configuration is enabled |
 
 **Team sandbox region:** `us-east-2` (US East, Ohio), where the team's AWS test sandbox is set up. The adapter scans the region supplied in `connection_context`; it is not restricted to the sandbox region.
 
@@ -429,23 +433,29 @@ After preparing the development database, load fictional resources with:
 bin/rails db:seed
 ```
 
-Open `/` or `/dashboard` on the running Rails server to view stored EC2 and S3 resources across all environments. Loading seeds and viewing the dashboard do not call AWS or require AWS credentials.
+Open `/` or `/dashboard` on the running Rails server to view stored EC2 and S3
+resources across all environments. Click a resource name to open its detail page
+(`/resources/:id`) and use **Open in AWS** when a console URL is present.
+Loading seeds and viewing the overview do not call AWS or require AWS credentials.
 
 The `Course demo` environment uses fictional `us-east-1` resources. It is separate from the team's live `us-east-2` sandbox and demonstrates that stored inventory is not restricted to the sandbox region. Rerunning seeds refreshes the demo records while preserving their database IDs and unrelated inventory. Keep the demo environment's name, provider, and region stable; changing them can create another demo environment. Manual edits to seeded resource attributes are overwritten on the next seed run.
 
-The dashboard reads stored records. Running the adapter or
+The overview reads stored records. Running the adapter or
 `script/verify_resources.rb` alone returns discovery results without saving them;
 the implemented ScanCoordinator workflow persists both inventory and scan history.
 Refreshing requires `ENABLE_MANUAL_SCANS=true`, `SCAN_ADMIN_USERNAME`,
 `SCAN_ADMIN_PASSWORD`, and an appropriately configured AWS credential source.
+On Heroku, enable scans only when live AWS credentials are configured; otherwise
+leave scans off and rely on the seeded demo inventory.
 
 Shared personalization writes are independently guarded by
 `ENABLE_RESOURCE_PERSONALIZATION=true`, `RESOURCE_ADMIN_USERNAME`, and
 `RESOURCE_ADMIN_PASSWORD`. Missing configuration disables the endpoints; enabled
-writes require HTTP Basic authentication and Rails CSRF protection. Configure
-credentials as runtime secrets and use HTTPS in deployment. No AWS credentials are
-needed to personalize stored demo inventory. Hidden state is a presentation
-preference, not an access-control boundary.
+writes require HTTP Basic authentication and Rails CSRF protection. For the
+Heroku demo, set `ENABLE_RESOURCE_PERSONALIZATION=true` (and the admin credentials)
+so pin/hide works against stored inventory. No AWS credentials are needed to
+personalize demo inventory. Hidden state is a presentation preference, not an
+access-control boundary.
 
 ## Development Status
 

@@ -1,8 +1,11 @@
 
-<% content_for :title, "Dashboard | Cloud Infrastructure Explorer" %>
+<% content_for :title, "Overview | Cloud Infrastructure Explorer" %>
 
 <header>
   <h1>Cloud Infrastructure Explorer</h1>
+  <p class="page-description">
+    A shared curated view of the AWS resources your team uses most — not a full cloud console.
+  </p>
 </header>
 
 <% if flash[:notice].present? %>
@@ -12,72 +15,51 @@
   <p role="alert"><%= flash[:alert] %></p>
 <% end %>
 
-
-<% if @connected_environment %>
-  <section class="connected-account-card" aria-label="Connected AWS account">
+<% if @selected_environment %>
+  <section class="environment-card" aria-label="Selected environment">
     <div class="account-details">
-      <span class="account-label">CONNECTED ACCOUNT</span>
-
-      <h2><%= @connected_environment.name %></h2>
-
-      <p class="account-region">
-        AWS · <%= @connected_environment.region %>
-      </p>
+      <span class="account-label">ENVIRONMENT</span>
+      <h2><%= @selected_environment.name %></h2>
+      <p class="account-region">AWS · <%= @selected_environment.region %></p>
 
       <% if @scan_enabled %>
-        <%= render "scan_controls", environment: @connected_environment, environments: @scan_environments %>
+        <%= render "scan_controls", environment: @selected_environment, environments: @scan_environments %>
         <%= render "scan_result", scan: @latest_scan %>
       <% end %>
     </div>
 
     <div class="account-update">
-      <span class="update-label">● Last updated</span>
-
+      <span class="update-label">Last successful scan</span>
       <% if @last_successful_scan %>
         <%= time_tag @last_successful_scan.completed_at,
           @last_successful_scan.completed_at.in_time_zone.strftime("%b %-d, %Y at %-I:%M %p") %>
       <% else %>
-        <span>No successful scans yet</span>
+        <span>—</span>
       <% end %>
     </div>
   </section>
 <% elsif @scan_enabled %>
-  <section class="connected-account-card" aria-label="Connected AWS account">
+  <section class="environment-card" aria-label="Selected environment">
     <p class="empty-state">No AWS environments are configured.</p>
   </section>
 <% end %>
 
-<section class="dashboard-stats" aria-label="Infrastructure overview">
-  <div class="stat-card">
-    <span class="stat-label">Active Services</span>
-    <div class="stat-value">
-      <span><%= @dashboard_stats[:active_services] %></span>
-      <small>/240+</small>
-    </div>
+<section class="pinned-strip" aria-labelledby="pinned-heading">
+  <div class="pinned-strip-header">
+    <h2 id="pinned-heading">Pinned</h2>
+    <%= link_to "View all pinned", resources_path(pinned: "1") %>
   </div>
-
-  <div class="stat-card">
-    <span class="stat-label">Total Resources</span>
-    <div class="stat-value">
-      <span><%= @dashboard_stats[:total_resources] %></span>
-    </div>
-  </div>
-
-  <div class="stat-card">
-    <%= link_to "Pinned", resources_path(pinned: "1"), class: "stat-label" %>
-    <div class="stat-value">
-      <span><%= @dashboard_stats[:pinned] %></span>
-      <small>/<%= @dashboard_stats[:total_resources] %></small>
-    </div>
-  </div>
-
-  <div class="stat-card">
-    <span class="stat-label">Needs Attention</span>
-    <div class="stat-value">
-      <span>—</span>
-      <small>/<%= @dashboard_stats[:total_resources] %></small>
-    </div>
-  </div>
+  <% if @pinned_resources.any? %>
+    <ul class="pinned-chip-list">
+      <% @pinned_resources.each do |resource| %>
+        <li>
+          <%= link_to resource.name, resource_path(resource), class: "pinned-chip" %>
+        </li>
+      <% end %>
+    </ul>
+  <% else %>
+    <p class="empty-state">No pinned resources yet. Pin items from a category listing to surface them here.</p>
+  <% end %>
 </section>
 
 <p class="empty-state">Inventory counts include visible resources only. <%= link_to "View hidden resources", resources_path(visibility: "hidden") %></p>
@@ -85,12 +67,11 @@
 <div class="category-grid">
   <%= render "home/category_card",
       service: "ec2",
-      name: "EC2 Instances",
+      name: "Compute",
       count: @resource_counts.fetch("ec2", 0) %>
 
   <%= render "home/category_card",
       service: "s3",
-      name: "S3 Buckets",
+      name: "Storage",
       count: @resource_counts.fetch("s3", 0) %>
 </div>
-

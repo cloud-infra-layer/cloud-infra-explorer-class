@@ -2,14 +2,14 @@ require "test_helper"
 
 class ResourcesControllerTest < ActionDispatch::IntegrationTest
   test "resource index and supported categories render inventory" do
-    { nil => "Resources", "ec2" => "EC2 Resources", "s3" => "S3 Resources" }.each do |service, title|
+    { nil => "Resources", "ec2" => "Compute", "s3" => "Storage" }.each do |service, title|
       get resources_url, params: { service: service }
 
       assert_response :success
       assert_select "h1", title
       assert_select "h2", "Stored inventory"
       assert_select "table.resource-table", count: 1
-      assert_select "a[href=?]", root_path, text: "Back to dashboard"
+      assert_select "a[href=?]", root_path, text: "Back to overview"
     end
   end
 
@@ -31,7 +31,7 @@ class ResourcesControllerTest < ActionDispatch::IntegrationTest
       assert_select "tbody tr", count: Resource.where(provider: "aws", service: service).count
       assert_select "tbody th", resource.name
       assert_select "tbody td", resource.resource_id
-      assert_select "tbody td", service.upcase
+      assert_select "tbody td", service == "ec2" ? "Compute" : "Storage"
       assert_select "tbody td", resource.region.presence || "Unknown"
       assert_select "tbody td", text: service == "ec2" ? "Instance type: t3.micro · State: running" : "Purpose: Static assets"
       other = service == "ec2" ? resources(:assets_bucket) : resources(:web_server)
@@ -59,7 +59,7 @@ class ResourcesControllerTest < ActionDispatch::IntegrationTest
       get resources_url, params: { service: service }
 
       assert_response :success
-      assert_select ".empty-state", "No #{service.upcase} resources found."
+      assert_select ".empty-state", "No #{service == "ec2" ? "Compute" : "Storage"} resources found."
       assert_select "table", count: 0
     end
 
@@ -103,4 +103,26 @@ class ResourcesControllerTest < ActionDispatch::IntegrationTest
   ensure
     original_values&.each { |key, value| ENV[key] = value }
   end
+  test "resource detail page shows metadata and Open in AWS" do
+    resource = resources(:web_server)
+
+    get resource_url(resource)
+
+    assert_response :success
+    assert_select "h1", resource.name
+    assert_select ".resource-detail-eyebrow", "Compute"
+    assert_select "a.resource-console-link[href=?]", resource.console_url, text: "Open in AWS"
+    assert_select "a[href=?]", resources_path(service: "ec2"), text: "Back to Compute"
+    assert_select "a[href=?]", root_path, text: "Back to overview"
+  end
+
+  test "resource name links from the inventory table to the detail page" do
+    resource = resources(:assets_bucket)
+
+    get resources_url, params: { service: "s3" }
+
+    assert_response :success
+    assert_select "tbody th a[href=?]", resource_path(resource), text: resource.name
+  end
+
 end

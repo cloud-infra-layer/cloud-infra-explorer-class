@@ -19,7 +19,7 @@ Feature: Search and filter stored resources
     And I search for "production"
     Then the resource results should include "production-web"
     And the resource results should include "production-assets"
-    When I filter by "EC2"
+    When I filter by "Compute"
     Then the resource results should include "production-web"
     And the resource results should not include "production-assets"
     When I filter by "All categories"
@@ -34,11 +34,11 @@ Feature: Search and filter stored resources
 
   Scenario: Clear search while preserving the category
     When I visit the resource listing
-    And I filter by "EC2"
+    And I filter by "Compute"
     And I search for "nonexistent-resource"
     Then the resource results should be empty
     When I click "Clear search"
     Then the search query should be empty
-    And the selected category should be "EC2"
+    And the selected category should be "Compute"
     And the resource results should include "production-web"
     And the resource results should not include "production-assets"

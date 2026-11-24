@@ -4,7 +4,7 @@
     <thead>
       <tr>
         <th scope="col">Resource name</th>
-        <th scope="col">Service</th>
+        <th scope="col">Category</th>
         <th scope="col">Region</th>
         <th scope="col">Resource ID</th>
         <th scope="col">Metadata</th>
@@ -17,12 +17,12 @@
     <tbody>
       <% resources.each do |resource| %>
         <tr>
-          <th scope="row"><%= resource.name %></th>
-          <td><%= resource.service.upcase %></td>
+          <th scope="row"><%= link_to resource.name, resource_path(resource) %></th>
+          <td><%= category_label(resource.service) %></td>
           <td><%= resource.region.presence || "Unknown" %></td>
           <td class="resource-identifier"><%= resource.resource_id %></td>
           <td><%= resource_metadata(resource) %></td>
-          <td><%= resource.hidden? ? "Hidden" : (resource.pinned? ? "Pinned" : "Unpinned") %></td>
+          <td><%= resource_status_label(resource) %></td>
           <% if personalization_enabled %>
             <td>
               <div class="resource-actions">

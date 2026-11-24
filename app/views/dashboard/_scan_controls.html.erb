@@ -1,5 +1,5 @@
 <%= form_with url: dashboard_path, method: :get, class: "scan-environment-form" do %>
-  <%= label_tag :environment_id, "AWS environment" %>
+  <%= label_tag :environment_id, "Environment" %>
   <div class="scan-environment-fields">
     <%= select_tag :environment_id, options_for_select(
       environments.map { |item| ["#{item.name} (#{item.region})", item.id] }, environment.id
