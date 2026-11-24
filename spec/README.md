@@ -68,7 +68,7 @@ does not load Minitest's `test_helper.rb` or runner.
 | `spec/models/resource_search_spec.rb` | Resource search controller tests | Case-insensitive matching, blank queries, literal special characters, category composition, and environment isolation |
 | `spec/models/resource_personalization_spec.rb` | Resource personalization model tests | Defaults, pin/hide persistence, restoration semantics, visibility scopes, ordering, and non-null constraints |
 | `spec/features/resource_search_spec.rb` | Resource search controller tests | Search form submission, category selection, no-match feedback, and clearing search |
-| `spec/requests/resource_personalization_spec.rb` | Resource personalization controller tests | Protected PATCH actions, authentication, disabled configuration, repeatability, field restrictions, restoration, and CSRF protection |
+| `spec/requests/resource_personalization_spec.rb` | Resource personalization controller tests | Feature-flagged PATCH actions, disabled configuration, repeatability, field restrictions, restoration, and CSRF protection |
 | `spec/requests/resource_visibility_spec.rb` | Resource visibility controller tests | Visible/hidden filtering, combined search/category filters, pinned ordering, and visible-only dashboard counts |
 | `spec/services/cloud_provider/adapter_spec.rb` | EC2 and S3 adapter tests | Seven-field normalization, stable identities, metadata allowlists, regions, pagination, invalid input, credential/API/network errors, empty results, and partial-service survival |
 | `spec/services/scan_coordinator_spec.rb` | ScanCoordinator tests | Persisted scan lifecycle, real resource synchronization, counts, repeatability, personalization, partial/failed discovery, safe errors, and input validation |

@@ -9,19 +9,24 @@ The project is being developed by a four-person team for Columbia University's C
 - **Live SaaS Deployment (Heroku):** https://cloud-infra-explorer-class-8dbdbc772bf8.herokuapp.com/
 - **GitHub Repository:** https://github.com/cloud-infra-layer/cloud-infra-explorer-class
 
-> **Note for Teaching Staff:**
-> Evaluating and testing this product does **NOT** require an AWS account or AWS credentials. 
-> The application includes pre-seeded demo resources in PostgreSQL (`Course demo` environment), and all automated test suites (RSpec, Cucumber) use synthetic test databases and mocked AWS SDK responses.
+> **Note for Teaching Staff (Iteration 2):**
+> Evaluating this product does **NOT** require an AWS account or AWS credentials.
+> The Heroku deployment is a seeded demo (`Course demo` environment in PostgreSQL).
+> Browse EC2/S3 inventory, search/filter, and pin/hide/restore without signing in.
+> **Refresh resources** is intentionally **disabled** on Heroku for Iteration 2
+> (`ENABLE_MANUAL_SCANS` off) until live AWS refresh is productized in a later
+> iteration. Automated RSpec and Cucumber suites still cover scan behavior with
+> mocked AWS responses when that flag is enabled in test.
 
-Start with the EC2 or S3 category and search by resource name, service, or AWS ID.
-The public UI supports browsing, searching, filtering, pinning, unpinning,
-hiding, and restoring stored EC2/S3 resources. Users can access dedicated
-pinned and hidden inventory views. When manual scans are enabled, users can select an
-AWS environment, initiate EC2/S3 discovery, and view scan results.
+### What to try on Heroku
 
-Live refresh requires `ENABLE_MANUAL_SCANS=true` and configured read-only
-AWS credentials on the host; it is not required to evaluate demo inventory. A stored demo
-environment is not proof of a connected AWS account or a successful live scan.
+1. Open the deployment link above.
+2. Open **EC2 Resources** or **S3 Buckets**, then search by name, service, or AWS ID.
+3. Pin, unpin, hide, and restore resources (shared team preferences; no login).
+4. Use the dedicated pinned and hidden inventory views.
+
+Do not expect a working **Refresh resources** control on the live demo for this
+iteration. A stored demo environment is not proof of a connected AWS account.
 
 ## Project Overview
 
@@ -39,25 +44,26 @@ shared team view, not individual user accounts, and do not change resources in A
 | Shared pin/unpin and hide/restore | Implemented with feature-flagged UI controls and persistent shared preferences |
 | Focus on important inventory | Pinned resources appear first, with a dedicated pinned view and dashboard shortcut; hidden resources are excluded from normal listings and counts |
 | Find hidden resources | Dedicated hidden inventory view supports restoring resources without modifying AWS infrastructure |
-| Read-only EC2/S3 discovery | Adapter implemented; live access depends on deployment credentials and permissions |
+| Read-only EC2/S3 discovery | Adapter implemented and covered by tests; not required for Iteration 2 demo evaluation |
 | Persist scan results and scan history | ScanCoordinator and ResourceSync implemented, including partial/failure handling |
-| Manual refresh | Feature-flagged dashboard controls support environment and EC2/S3 selection, scan status, and result feedback when scan configuration is enabled |
+| Manual refresh (Refresh resources) | Implemented behind `ENABLE_MANUAL_SCANS`; **off on Heroku for Iteration 2**; covered by Cucumber/RSpec with mocked AWS |
 
 **Team sandbox region:** `us-east-2` (US East, Ohio), where the team's AWS test sandbox is set up. The adapter scans the region supplied in `connection_context`; it is not restricted to the sandbox region.
 
-The application uses a Ruby on Rails monolith with PostgreSQL. A feature-flagged
-manual refresh follows this implemented flow:
+The application uses a Ruby on Rails monolith with PostgreSQL. Views read
+PostgreSQL rather than calling AWS directly. When `ENABLE_MANUAL_SCANS` is on,
+manual refresh follows:
 
 `ScansController → ScanCoordinator → CloudProvider::Adapter → ResourceSync → PostgreSQL`
 
 ScanCoordinator creates a running Scan, requests discovery, passes successful
-service results to ResourceSync, and persists the final status, counts, timestamps,
-and safe errors. ResourceSync updates existing resources in place, preserving
-database IDs and personalization. Failed services and resources absent from a scan
-do not cause stored inventory to be deleted. Views read PostgreSQL rather than
-calling AWS directly.
+service results to ResourceSync, and persists status, counts, timestamps, and
+safe errors. ResourceSync updates existing resources in place, preserving
+database IDs and personalization. Failed services and resources absent from a
+scan do not delete stored inventory.
 
-See [AWS development setup](docs/aws-setup.md) for authentication, the discovery role, and the manual verification command.
+See [AWS development setup](docs/aws-setup.md) for optional local AWS setup. This
+is not required to evaluate the Iteration 2 Heroku demo.
 
 ## Technology Stack
 
@@ -244,14 +250,18 @@ bin/rails test
 ```bash
 bundle exec cucumber
 ```
-*(16 acceptance scenarios covering dashboard browsing, search/filtering, pinning/unpinning, hiding/restoring, successful manual scans, and failed scans that preserve existing inventory.)*
+*(16 acceptance scenarios: dashboard browsing, search/filtering, pin/unpin,
+hide/restore, plus successful and failed manual scans with mocked AWS. Scan
+scenarios enable `ENABLE_MANUAL_SCANS` in the test process; they do not require
+live AWS or the Heroku refresh control.)*
 
 **4. Rails system-test runner**:
 
-The system-test runner includes a browser-based test for manual scan controls,
-including loading-state feedback and duplicate-submission prevention at desktop
-and mobile viewport sizes. Existing RSpec feature specs use Capybara RackTest
-and do not independently verify JavaScript or visual layout.
+The system-test runner includes a browser-based test for manual scan controls
+(when the scan flag is enabled in test), including loading-state feedback and
+duplicate-submission prevention at desktop and mobile viewport sizes. Existing
+RSpec feature specs use Capybara RackTest and do not independently verify
+JavaScript or visual layout.
 
 ```bash
 bin/rails test:system
@@ -436,29 +446,43 @@ The `Course demo` environment uses fictional `us-east-1` resources. It is separa
 The dashboard reads stored records. Running the adapter or
 `script/verify_resources.rb` alone returns discovery results without saving them;
 the implemented ScanCoordinator workflow persists both inventory and scan history.
-Refreshing requires `ENABLE_MANUAL_SCANS=true` and an appropriately configured AWS
-credential source on the application host. Shared personalization writes require
-`ENABLE_RESOURCE_PERSONALIZATION=true`. Missing flags disable those endpoints.
-Rails CSRF protection remains enabled on write forms. Iteration 2 intentionally
-omits end-user login; pin/hide and scans are feature-flagged for the shared demo.
-No AWS credentials are needed to personalize stored demo inventory. Hidden state
-is a presentation preference, not an access-control boundary.
+
+**Iteration 2 Heroku configuration (evaluation target):**
+
+| Flag / capability | Heroku Iter 2 |
+|---|---|
+| Seeded `Course demo` inventory | On |
+| `ENABLE_RESOURCE_PERSONALIZATION` | On — pin/hide/restore without login or HTTP Basic auth |
+| `ENABLE_MANUAL_SCANS` / Refresh resources | **Off** — deferred to a later iteration for the live demo |
+| AWS credentials on the dyno | Not required for evaluation |
+
+Locally, enable personalization with:
+
+```bash
+ENABLE_RESOURCE_PERSONALIZATION=true bin/rails server
+```
+
+To exercise refresh locally (optional; needs AWS credentials):
+
+```bash
+ENABLE_MANUAL_SCANS=true bin/rails server
+```
+
+Missing flags disable those endpoints (404 / UI hidden). Rails CSRF protection
+remains enabled on write forms. Hidden state is a presentation preference, not an
+access-control boundary.
 
 ## Development Status
 
-The initial Rails application, PostgreSQL configuration, repository, and continuous integration workflow are established.
+The Iteration 2 prototype is a curated AWS inventory dashboard: seeded demo
+browse/search, shared pin/hide/restore, and Heroku deployment for staff
+evaluation without AWS accounts. Read-only EC2/S3 discovery, ScanCoordinator,
+and ResourceSync are implemented and tested; live **Refresh resources** remains
+feature-flagged and is disabled on the Iteration 2 Heroku demo.
 
-Implemented: read-only EC2/S3 discovery, scan orchestration and persistence,
-feature-flagged manual refresh, resource searching and filtering, shared resource
-pinning and hiding, and user-facing inventory management controls. S3 discovery
-requires the read-only policy described in [AWS development setup](docs/aws-setup.md).
-
-The MVP provides a curated AWS inventory dashboard without modifying AWS
-infrastructure. Cucumber acceptance scenarios cover the core workflows,
-including successful and failed scans.
-
-Live AWS connectivity and deployment configuration must be verified separately
-from automated tests, which use mocked discovery responses.
+Cucumber acceptance scenarios cover the core product workflows, including
+mocked successful and failed scans. Live AWS connectivity is verified separately
+from automated tests.
 
 ## Team
 
