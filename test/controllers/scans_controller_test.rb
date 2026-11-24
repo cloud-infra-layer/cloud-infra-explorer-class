@@ -1,14 +1,13 @@
 require "test_helper"
-require "base64"
 
 class ScansControllerTest < ActionDispatch::IntegrationTest
   setup do
     @environment = environments(:course_testing)
-    @original = %w[ENABLE_MANUAL_SCANS SCAN_ADMIN_USERNAME SCAN_ADMIN_PASSWORD].to_h { |key| [ key, ENV[key] ] }
+    @original = ENV["ENABLE_MANUAL_SCANS"]
   end
 
   teardown do
-    @original.each { |key, value| value.nil? ? ENV.delete(key) : ENV[key] = value }
+    @original.nil? ? ENV.delete("ENABLE_MANUAL_SCANS") : ENV["ENABLE_MANUAL_SCANS"] = @original
   end
 
   test "endpoint is unavailable without explicit enablement" do
@@ -20,29 +19,14 @@ class ScansControllerTest < ActionDispatch::IntegrationTest
     end
   end
 
-  test "requires credentials even when feature flag is on" do
-    ENV["ENABLE_MANUAL_SCANS"] = "true"
-    ENV.delete("SCAN_ADMIN_PASSWORD")
-    post environment_scans_path(@environment)
-    assert_response :not_found
-  end
-
-  test "rejects unauthenticated scan requests" do
-    enable_scans
-    assert_no_difference "Scan.count" do
-      post environment_scans_path(@environment)
-      assert_response :unauthorized
-    end
-  end
-
   test "rejects invalid resource types before invoking coordinator" do
     enable_scans
-    post environment_scans_path(@environment), params: { resource_types: [ "lambda" ] }, headers: auth_headers
+    post environment_scans_path(@environment), params: { resource_types: [ "lambda" ] }
     assert_redirected_to dashboard_path(environment_id: @environment.id)
     assert_equal "Select valid EC2/S3 resource types.", flash[:alert]
   end
 
-  test "authorized request invokes coordinator and redirects" do
+  test "enabled request invokes coordinator and redirects" do
     enable_scans
     fake = Object.new
     fake.define_singleton_method(:call) do |resource_types:|
@@ -53,7 +37,7 @@ class ScansControllerTest < ActionDispatch::IntegrationTest
     original_constructor = ScanCoordinator.method(:new)
     begin
       ScanCoordinator.define_singleton_method(:new) { |**_kwargs| fake }
-      post environment_scans_path(@environment), headers: auth_headers
+      post environment_scans_path(@environment)
     ensure
       ScanCoordinator.define_singleton_method(:new, original_constructor)
     end
@@ -170,11 +154,5 @@ class ScansControllerTest < ActionDispatch::IntegrationTest
 
   def enable_scans
     ENV["ENABLE_MANUAL_SCANS"] = "true"
-    ENV["SCAN_ADMIN_USERNAME"] = "test-admin"
-    ENV["SCAN_ADMIN_PASSWORD"] = "test-password"
-  end
-
-  def auth_headers
-    { "Authorization" => "Basic #{Base64.strict_encode64('test-admin:test-password')}" }
   end
 end

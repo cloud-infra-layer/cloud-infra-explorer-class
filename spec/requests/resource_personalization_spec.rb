@@ -1,21 +1,16 @@
 require "rails_helper"
 
-RSpec.describe "Protected resource personalization", type: :request do
+RSpec.describe "Resource personalization writes", type: :request do
   let(:environment) { Environment.create!(name: "Protected actions", provider: "aws", region: "us-east-1") }
   let(:resource) do
     environment.resources.create!(provider: "aws", service: "ec2", resource_id: "i-protected",
       name: "Protected server", metadata: {})
   end
-  let(:auth_headers) do
-    { "Authorization" => ActionController::HttpAuthentication::Basic.encode_credentials("test-editor", "test-password") }
-  end
 
   around do |example|
-    keys = %w[ENABLE_RESOURCE_PERSONALIZATION RESOURCE_ADMIN_USERNAME RESOURCE_ADMIN_PASSWORD ENABLE_MANUAL_SCANS]
+    keys = %w[ENABLE_RESOURCE_PERSONALIZATION ENABLE_MANUAL_SCANS]
     original = keys.to_h { |key| [ key, ENV[key] ] }
     ENV["ENABLE_RESOURCE_PERSONALIZATION"] = "true"
-    ENV["RESOURCE_ADMIN_USERNAME"] = "test-editor"
-    ENV["RESOURCE_ADMIN_PASSWORD"] = "test-password"
     ENV["ENABLE_MANUAL_SCANS"] = "false"
     example.run
   ensure
@@ -35,7 +30,7 @@ RSpec.describe "Protected resource personalization", type: :request do
         resource.update!(attribute => !value)
         original = resource.reload.attributes.except(attribute.to_s, "updated_at")
         2.times do
-          patch path, headers: auth_headers, params: { resource: { name: "Injected", pinned: !value, hidden: !value }, return_to: "https://example.com" }
+          patch path, params: { resource: { name: "Injected", pinned: !value, hidden: !value }, return_to: "https://example.com" }
           expect(response).to have_http_status(:see_other)
           expect(response).to redirect_to(resources_path)
           expect(resource.reload[attribute]).to eq(value)
@@ -43,33 +38,17 @@ RSpec.describe "Protected resource personalization", type: :request do
         end
       end
 
-      it "rejects missing and incorrect credentials without changing the resource" do
+      it "returns 404 when personalization is disabled" do
         original = resource.attributes
-        [ {}, { "Authorization" => ActionController::HttpAuthentication::Basic.encode_credentials("test-editor", "wrong") } ].each do |headers|
-          patch path, headers: headers
-          expect(response).to have_http_status(:unauthorized)
-          expect(response.headers["WWW-Authenticate"]).to include("Basic")
-          expect(resource.reload.attributes).to eq(original)
-        end
-      end
-
-      it "returns 404 when disabled or incompletely configured even with valid credentials" do
-        original = resource.attributes
-        %w[ENABLE_RESOURCE_PERSONALIZATION RESOURCE_ADMIN_USERNAME RESOURCE_ADMIN_PASSWORD].each do |key|
-          saved = ENV.delete(key)
-          begin
-            patch path, headers: auth_headers
-            expect(response).to have_http_status(:not_found)
-            expect(resource.reload.attributes).to eq(original)
-          ensure
-            ENV[key] = saved
-          end
-        end
+        ENV["ENABLE_RESOURCE_PERSONALIZATION"] = "false"
+        patch path
+        expect(response).to have_http_status(:not_found)
+        expect(resource.reload.attributes).to eq(original)
       end
 
       it "does not expose the action through GET" do
         original = resource.attributes
-        get path, headers: auth_headers
+        get path
         expect(response).to have_http_status(:not_found)
         expect(resource.reload.attributes).to eq(original)
       end
@@ -78,27 +57,27 @@ RSpec.describe "Protected resource personalization", type: :request do
 
   it "finds hidden resources for restoration and preserves their pin" do
     resource.update!(pinned: true, hidden: true)
-    patch restore_resource_path(resource), headers: auth_headers
+    patch restore_resource_path(resource)
     expect(resource.reload).not_to be_hidden
     expect(resource).to be_pinned
   end
 
   it "redirects only to a listing with validated filters" do
-    patch hide_resource_path(resource), headers: auth_headers, params: {
+    patch hide_resource_path(resource), params: {
       q: "  server ", service: "ec2", pinned: "1", return_to: "https://example.com"
     }
     expect(response).to redirect_to(resources_path(q: "server", service: "ec2", pinned: "1"))
     expect(resource.reload).to be_hidden
 
-    patch restore_resource_path(resource), headers: auth_headers, params: {
+    patch restore_resource_path(resource), params: {
       q: [ "server" ], service: "unsupported", visibility: { url: "https://example.com" }, pinned: "yes"
     }
     expect(response).to redirect_to(resources_path)
     expect(resource.reload).not_to be_hidden
   end
 
-  it "returns 404 for a missing resource after authentication" do
-    patch pin_resource_path(id: 0), headers: auth_headers
+  it "returns 404 for a missing resource when personalization is enabled" do
+    patch pin_resource_path(id: 0)
     expect(response).to have_http_status(:not_found)
   end
 
@@ -112,7 +91,7 @@ RSpec.describe "Protected resource personalization", type: :request do
     previous = ActionController::Base.allow_forgery_protection
     ActionController::Base.allow_forgery_protection = true
     original = resource.attributes
-    patch pin_resource_path(resource), headers: auth_headers
+    patch pin_resource_path(resource)
     expect(response).to have_http_status(422)
     expect(resource.reload.attributes).to eq(original)
   ensure

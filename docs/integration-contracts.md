@@ -575,18 +575,17 @@ and Brayden; checkpoint 1 adds only persistence, scopes, and model tests.
 - `visibility=hidden` selects hidden inventory; the default is visible inventory.
 - Explicit PATCH member actions `/resources/:id/pin`, `/unpin`, `/hide`, and
   `/restore` set one boolean to a fixed value. GET never mutates personalization.
-- Resource writes require `ENABLE_RESOURCE_PERSONALIZATION=true` and nonblank
-  `RESOURCE_ADMIN_USERNAME` and `RESOURCE_ADMIN_PASSWORD`, using HTTP Basic auth.
-  The existing scan flag and scan credentials remain independent and unchanged.
-- Writes fail closed: disabled or incomplete configuration returns 404; enabled
-  requests with absent or incorrect credentials receive a 401 challenge.
-  Rails CSRF protection remains enabled. Hiding buttons alone is not authorization.
+- Resource writes require `ENABLE_RESOURCE_PERSONALIZATION=true`. Manual scans
+  require `ENABLE_MANUAL_SCANS=true`. The flags are independent. Iteration 2 does
+  not use HTTP Basic or per-user login for these writes.
+- Writes fail closed when the relevant flag is missing or not `true` (404).
+  Rails CSRF protection remains enabled on mutation forms.
 - Inventory reads remain available under the existing read-access policy. Hidden
   state is a presentation preference, not a confidentiality/access boundary.
-- Deployments leave personalization writes disabled until both credentials are
-  configured as runtime secrets and HTTPS is enforced. Never commit credentials
-  or include them in URLs, forms, resource records, or documentation examples.
-  Local HTTP testing is restricted to localhost with development-only credentials.
+- For the shared course demo, personalization may be enabled without AWS
+  credentials. Enabling scans still requires a configured AWS credential source
+  on the host if live discovery is desired. A later iteration should replace
+  feature-flagged public writes with real application auth and AWS account linking.
 - The frontend should explain that pin/hide changes affect the shared team view.
 
 Checkpoint 1 exposes `Resource.visible`, `Resource.hidden`, and
@@ -604,12 +603,12 @@ Visibility controls, dashboard changes, and mutation endpoints remain subsequent
 checkpoints; this checkpoint retains the existing listing visibility and ordering.
 
 Checkpoint 3 implements the four PATCH member actions and the personalization
-access guard described above. Actions locate resources by database ID (including
-hidden resources), assign only their one fixed boolean, and redirect with HTTP
-303 to `/resources` with a shared-team notice. Unrelated request attributes and
-user-supplied redirect URLs are ignored. Missing IDs return 404 after authorization.
-GET requests have no mutation route. Rails CSRF protection is retained, in addition
-to Basic authentication. UI controls and context-preserving redirects are deferred
+feature-flag guard described above. Actions locate resources by database ID
+(including hidden resources), assign only their one fixed boolean, and redirect
+with HTTP 303 to `/resources` with a shared-team notice. Unrelated request
+attributes and user-supplied redirect URLs are ignored. Missing IDs return 404
+when the feature is enabled. GET requests have no mutation route. Rails CSRF
+protection is retained. UI controls and context-preserving redirects are deferred
 to the interface checkpoint; current redirects return to the unfiltered listing.
 
 ### Checkpoint 4: visibility queries and frontend handoff

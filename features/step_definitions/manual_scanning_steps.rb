@@ -1,19 +1,10 @@
 
 Before("@manual_scan") do
   @previous_scan_settings = {
-    "ENABLE_MANUAL_SCANS" => ENV["ENABLE_MANUAL_SCANS"],
-    "SCAN_ADMIN_USERNAME" => ENV["SCAN_ADMIN_USERNAME"],
-    "SCAN_ADMIN_PASSWORD" => ENV["SCAN_ADMIN_PASSWORD"]
+    "ENABLE_MANUAL_SCANS" => ENV["ENABLE_MANUAL_SCANS"]
   }
 
   ENV["ENABLE_MANUAL_SCANS"] = "true"
-  ENV["SCAN_ADMIN_USERNAME"] = "cucumber-scan-admin"
-  ENV["SCAN_ADMIN_PASSWORD"] = "cucumber-scan-password"
-
-  credentials = ActionController::HttpAuthentication::Basic.encode_credentials(
-    "cucumber-scan-admin", "cucumber-scan-password"
-  )
-  page.driver.header("Authorization", credentials)
 
   @original_adapter_new = CloudProvider::Adapter.method(:new)
 end
@@ -26,10 +17,8 @@ After("@manual_scan") do
   end
 
   @previous_scan_settings.each do |key, value|
-    ENV[key] = value
+    value.nil? ? ENV.delete(key) : ENV[key] = value
   end
-
-  page.driver.header("Authorization", nil)
 end
 
 Given("AWS discovery will find a new S3 bucket") do
