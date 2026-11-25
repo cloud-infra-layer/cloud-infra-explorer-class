@@ -15,9 +15,10 @@ Feature: Cloud infrastructure dashboard
     And the application contains an S3 bucket named "assets-bucket"
     When I visit the dashboard
     Then I should see one resource in each category
+    And I should see category insights on the overview cards
     When I click the EC2 category
     Then I should see "web-server"
-    When I click "Back to dashboard"
+    When I click "Back to overview"
     And I click the S3 category
     Then I should see "assets-bucket"
 

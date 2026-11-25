@@ -1,9 +1,4 @@
-
-<% content_for :title, "Dashboard | Cloud Infrastructure Explorer" %>
-
-<header>
-  <h1>Cloud Infrastructure Explorer</h1>
-</header>
+<% content_for :title, "Overview | Cloud Infrastructure Explorer" %>
 
 <% if flash[:notice].present? %>
   <p role="status"><%= flash[:notice] %></p>
@@ -12,16 +7,15 @@
   <p role="alert"><%= flash[:alert] %></p>
 <% end %>
 
-
 <% if @connected_environment %>
-  <section class="connected-account-card" aria-label="Connected AWS account">
+  <section class="connected-account-card" aria-label="Selected environment">
     <div class="account-details">
-      <span class="account-label">CONNECTED ACCOUNT</span>
+      <span class="account-label">ENVIRONMENT</span>
 
       <h2><%= @connected_environment.name %></h2>
 
       <p class="account-region">
-        AWS · <%= @connected_environment.region %>
+        <%= provider_label(@connected_environment.provider) %> · <%= @connected_environment.region %>
       </p>
 
       <% if @scan_enabled %>
@@ -31,66 +25,99 @@
     </div>
 
     <div class="account-update">
-      <span class="update-label">● Last updated</span>
+      <span class="update-label">● Last successful scan</span>
 
       <% if @last_successful_scan %>
         <%= time_tag @last_successful_scan.completed_at,
           @last_successful_scan.completed_at.in_time_zone.strftime("%b %-d, %Y at %-I:%M %p") %>
       <% else %>
-        <span>No successful scans yet</span>
+        <span>—</span>
       <% end %>
     </div>
   </section>
 <% elsif @scan_enabled %>
-  <section class="connected-account-card" aria-label="Connected AWS account">
-    <p class="empty-state">No AWS environments are configured.</p>
+  <section class="connected-account-card" aria-label="Selected environment">
+    <p class="empty-state">No environments are configured.</p>
   </section>
 <% end %>
 
-<section class="dashboard-stats" aria-label="Infrastructure overview">
-  <div class="stat-card">
-    <span class="stat-label">Active Services</span>
-    <div class="stat-value">
-      <span><%= @dashboard_stats[:active_services] %></span>
-      <small>/240+</small>
-    </div>
-  </div>
+<% if @cost_insights %>
+  <section class="cost-insights" aria-label="Cost insights">
+    <p class="cost-insights-period"><%= @cost_insights[:period_label] %></p>
+    <div class="dashboard-stats">
+      <div class="stat-card">
+        <span class="stat-label">Monthly spend</span>
+        <div class="stat-value">
+          <span>$<%= number_with_precision(@cost_insights[:current_total], precision: 2) %></span>
+        </div>
+        <div class="stat-deltas">
+          <span class="stat-delta">
+            <span class="stat-delta-label">MoM</span>
+            <%= render "trend_value", value: @cost_insights[:mom_pct] %>
+          </span>
+          <span class="stat-delta">
+            <span class="stat-delta-label">YoY</span>
+            <%= render "trend_value", value: @cost_insights[:yoy_pct] %>
+          </span>
+        </div>
+      </div>
 
-  <div class="stat-card">
-    <span class="stat-label">Total Resources</span>
-    <div class="stat-value">
-      <span><%= @dashboard_stats[:total_resources] %></span>
-    </div>
-  </div>
+      <div class="stat-card">
+        <span class="stat-label">Top cost driver</span>
+        <div class="stat-value stat-value--compact">
+          <span><%= cost_series_legend_label(@cost_insights[:top_service], provider: @cost_insights[:top_provider]) %></span>
+        </div>
+        <div class="stat-deltas">
+          <span class="stat-delta">
+            $<%= number_with_precision(@cost_insights[:top_amount], precision: 2) %>
+          </span>
+          <% if @cost_insights[:top_share] %>
+            <span class="stat-delta">
+              <%= number_with_precision(@cost_insights[:top_share], precision: 0) %>% of spend
+            </span>
+          <% end %>
+        </div>
+      </div>
 
-  <div class="stat-card">
-    <%= link_to "Pinned", resources_path(pinned: "1"), class: "stat-label" %>
-    <div class="stat-value">
-      <span><%= @dashboard_stats[:pinned] %></span>
-      <small>/<%= @dashboard_stats[:total_resources] %></small>
+      <div class="stat-card">
+        <span class="stat-label">Fastest growing</span>
+        <% if @cost_insights[:fastest_service] %>
+          <div class="stat-value stat-value--compact">
+            <span><%= cost_series_legend_label(@cost_insights[:fastest_service], provider: @cost_insights[:fastest_provider]) %></span>
+          </div>
+          <div class="stat-deltas">
+            <span class="stat-delta">
+              <%= render "trend_value", value: @cost_insights[:fastest_pct] %>
+            </span>
+            <span class="stat-delta">
+              $<%= number_with_precision(@cost_insights[:fastest_amount], precision: 2) %>
+            </span>
+          </div>
+        <% else %>
+          <div class="stat-value"><span>—</span></div>
+        <% end %>
+      </div>
     </div>
-  </div>
+  </section>
+<% end %>
 
-  <div class="stat-card">
-    <span class="stat-label">Needs Attention</span>
-    <div class="stat-value">
-      <span>—</span>
-      <small>/<%= @dashboard_stats[:total_resources] %></small>
-    </div>
-  </div>
-</section>
-
-<p class="empty-state">Inventory counts include visible resources only. <%= link_to "View hidden resources", resources_path(visibility: "hidden") %></p>
+<% if @cost_chart[:periods].any? %>
+  <section class="content-panel cost-panel" aria-labelledby="cost-overview-heading">
+    <h2 id="cost-overview-heading">Cost Explorer</h2>
+    <%= render "cost_chart", cost_chart: @cost_chart %>
+  </section>
+<% end %>
 
 <div class="category-grid">
-  <%= render "home/category_card",
-      service: "ec2",
-      name: "EC2 Instances",
-      count: @resource_counts.fetch("ec2", 0) %>
-
-  <%= render "home/category_card",
-      service: "s3",
-      name: "S3 Buckets",
-      count: @resource_counts.fetch("s3", 0) %>
+  <% Resource::CATEGORIES.each do |key, config| %>
+    <% insight = @category_insights.fetch(key) %>
+    <%= render "home/category_card",
+        path: resources_path(category: key),
+        category_key: key,
+        name: config.fetch(:label),
+        description: config.fetch(:description),
+        count: insight.fetch(:count),
+        pinned: insight.fetch(:pinned),
+        insight: insight.fetch(:insight) %>
+  <% end %>
 </div>
-

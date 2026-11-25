@@ -1,6 +1,14 @@
-<%= link_to resources_path(service: service), class: "content-panel category-card" do %>
-  <h2><%= name %></h2>
+<%= link_to path, class: "content-panel category-card" do %>
+  <div class="category-card-header">
+    <span class="category-icon" aria-hidden="true"><%= category_icon(category_key) %></span>
+    <h2><%= name %></h2>
+  </div>
   <p class="resource-count"><%= pluralize(count, "resource") %></p>
-  <p class="category-description"><%= count.zero? ? "No stored resources yet." : "Resources stored in your inventory." %></p>
+  <p class="category-insight"><%= insight %></p>
+  <% if count.positive? && pinned.positive? %>
+    <p class="category-meta"><%= pluralize(pinned, "pinned") %></p>
+  <% elsif count.positive? %>
+    <p class="category-meta"><%= description %></p>
+  <% end %>
   <span class="category-action">View <%= name %> <span aria-hidden="true">&rarr;</span></span>
 <% end %>

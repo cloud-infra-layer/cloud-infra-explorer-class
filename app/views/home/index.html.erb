@@ -1,7 +1,14 @@
-<% content_for :title, "Dashboard | Cloud Infrastructure Explorer" %>
-<h1>Dashboard</h1>
-<p class="page-description">Explore your cloud infrastructure in one place.</p>
+<% content_for :title, "Overview | Cloud Infrastructure Explorer" %>
 <div class="category-grid">
-  <%= render "category_card", service: "ec2", name: "EC2 Instances", count: @resource_counts.fetch("ec2", 0) %>
-  <%= render "category_card", service: "s3", name: "S3 Buckets", count: @resource_counts.fetch("s3", 0) %>
+  <% Resource::CATEGORIES.each do |key, config| %>
+    <% count = @resource_counts.fetch_values(*config.fetch(:services)) { 0 }.sum %>
+    <%= render "category_card",
+        path: resources_path(category: key),
+        category_key: key,
+        name: config.fetch(:label),
+        description: config.fetch(:description),
+        count: count,
+        pinned: 0,
+        insight: (count.zero? ? "No stored resources yet." : config.fetch(:description)) %>
+  <% end %>
 </div>

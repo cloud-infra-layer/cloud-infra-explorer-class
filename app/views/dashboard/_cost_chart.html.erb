@@ -1,0 +1,92 @@
+<% periods = cost_chart.fetch(:periods) %>
+<% series = cost_chart.fetch(:series) %>
+<% max_value = series.flat_map { |row| row.fetch(:values) }.max.to_f %>
+<% max_value = 1.0 if max_value <= 0 %>
+<% padding_left = 52 %>
+<% padding_right = 16 %>
+<% padding_top = 16 %>
+<% padding_bottom = 48 %>
+<% plot_height = 220 %>
+<% plot_width = 920 %>
+<% chart_width = padding_left + plot_width + padding_right %>
+<% chart_height = padding_top + plot_height + padding_bottom %>
+<% range_query = request.query_parameters.slice("environment_id") %>
+
+<figure class="cost-chart" data-controller="cost-chart" aria-labelledby="cost-overview-heading">
+  <nav class="cost-chart-ranges" aria-label="Cost time range">
+    <% ResourcesHelper::COST_RANGE_OPTIONS.each do |label, value| %>
+      <%= link_to label,
+            root_path(range_query.merge("cost_range" => value)),
+            class: [ "cost-chart-range", ("is-active" if cost_chart.fetch(:range) == value) ],
+            aria: { current: (cost_chart.fetch(:range) == value ? "page" : nil) } %>
+    <% end %>
+  </nav>
+
+  <div class="cost-chart-tooltip" data-cost-chart-target="tooltip" hidden></div>
+  <svg class="cost-chart-svg" viewBox="0 0 <%= chart_width %> <%= chart_height %>" preserveAspectRatio="none" width="100%" role="img" aria-label="Monthly cost trend by service">
+    <% [ 0.25, 0.5, 0.75, 1.0 ].each do |fraction| %>
+      <% y = padding_top + plot_height - (fraction * plot_height) %>
+      <line x1="<%= padding_left %>" y1="<%= y %>" x2="<%= chart_width - padding_right %>" y2="<%= y %>" class="cost-chart-grid" />
+      <text x="<%= padding_left - 8 %>" y="<%= y + 4 %>" text-anchor="end" class="cost-chart-label">
+        $<%= number_with_precision(max_value * fraction, precision: 0) %>
+      </text>
+    <% end %>
+
+    <% periods.each_with_index do |period, index| %>
+      <% x = padding_left + (periods.size == 1 ? plot_width / 2.0 : index * (plot_width.to_f / (periods.size - 1))) %>
+      <text x="<%= x %>" y="<%= chart_height - 24 %>" text-anchor="middle" class="cost-chart-label">
+        <%= period.strftime("%b") %>
+      </text>
+      <text x="<%= x %>" y="<%= chart_height - 10 %>" text-anchor="middle" class="cost-chart-label">
+        <%= period.strftime("%Y") %>
+      </text>
+    <% end %>
+
+    <% series.each do |row| %>
+      <% color = cost_series_color(row.fetch(:service_code)) %>
+      <% legend = cost_series_legend_label(row.fetch(:service_code), provider: row.fetch(:provider)) %>
+      <% points = row.fetch(:values).each_with_index.map do |value, index|
+           x = padding_left + (periods.size == 1 ? plot_width / 2.0 : index * (plot_width.to_f / (periods.size - 1)))
+           y = padding_top + plot_height - ((value / max_value) * plot_height)
+           [ x, y, value, periods.fetch(index) ]
+         end %>
+      <polyline
+        fill="none"
+        stroke="<%= color %>"
+        stroke-width="2.5"
+        stroke-linejoin="round"
+        stroke-linecap="round"
+        vector-effect="non-scaling-stroke"
+        points="<%= points.map { |x, y, _, _| "#{x},#{y}" }.join(' ') %>" />
+      <% points.each do |x, y, value, period| %>
+        <% label = "#{legend} · #{period.strftime('%b %Y')} · $#{number_with_precision(value, precision: 2)}" %>
+        <circle
+          class="cost-chart-point"
+          cx="<%= x %>"
+          cy="<%= y %>"
+          r="5.5"
+          fill="<%= color %>"
+          stroke="#fff"
+          stroke-width="2"
+          vector-effect="non-scaling-stroke"
+          tabindex="0"
+          role="img"
+          aria-label="<%= label %>"
+          data-cost-chart-target="point"
+          data-action="mouseenter->cost-chart#show focus->cost-chart#show mouseleave->cost-chart#hide blur->cost-chart#hide"
+          data-label="<%= label %>"
+          data-x="<%= x %>"
+          data-y="<%= y %>" />
+      <% end %>
+    <% end %>
+  </svg>
+
+  <ul class="cost-chart-legend">
+    <% series.each do |row| %>
+      <li>
+        <span class="cost-chart-swatch" style="background: <%= cost_series_color(row.fetch(:service_code)) %>"></span>
+        <%= cost_series_legend_label(row.fetch(:service_code), provider: row.fetch(:provider)) %>
+      </li>
+    <% end %>
+  </ul>
+</figure>

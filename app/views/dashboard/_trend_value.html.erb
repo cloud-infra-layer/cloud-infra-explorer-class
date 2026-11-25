@@ -1,0 +1,7 @@
+<% if value %>
+  <span class="<%= value.negative? ? 'stat-trend--down' : 'stat-trend--up' %>">
+    <%= value.positive? ? "+" : "" %><%= number_with_precision(value, precision: 1) %>%
+  </span>
+<% else %>
+  <span class="stat-trend--muted">—</span>
+<% end %>
