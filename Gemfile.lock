@@ -80,6 +80,12 @@ GEM
     ast (2.4.3)
     aws-eventstream (1.4.1)
     aws-partitions (1.1299.0)
+    aws-sdk-bedrock (1.98.0)
+      aws-sdk-core (~> 3, >= 3.260.0)
+      aws-sigv4 (~> 1.5)
+    aws-sdk-cloudwatch (1.152.0)
+      aws-sdk-core (~> 3, >= 3.260.0)
+      aws-sigv4 (~> 1.5)
     aws-sdk-core (3.261.0)
       aws-eventstream (~> 1, >= 1.4.1)
       aws-partitions (~> 1, >= 1.992.0)
@@ -89,10 +95,16 @@ GEM
       jmespath (~> 1, >= 1.6.1)
       logger
       rexml (~> 3.4, >= 3.4.2)
+    aws-sdk-costexplorer (1.160.0)
+      aws-sdk-core (~> 3, >= 3.260.0)
+      aws-sigv4 (~> 1.5)
     aws-sdk-ec2 (1.661.0)
       aws-sdk-core (~> 3, >= 3.260.0)
       aws-sigv4 (~> 1.5)
     aws-sdk-kms (1.136.0)
+      aws-sdk-core (~> 3, >= 3.260.0)
+      aws-sigv4 (~> 1.5)
+    aws-sdk-rds (1.327.0)
       aws-sdk-core (~> 3, >= 3.260.0)
       aws-sigv4 (~> 1.5)
     aws-sdk-s3 (1.235.0)
@@ -477,7 +489,11 @@ PLATFORMS
   x86_64-linux-musl
 
 DEPENDENCIES
+  aws-sdk-bedrock (~> 1)
+  aws-sdk-cloudwatch (~> 1)
+  aws-sdk-costexplorer (~> 1)
   aws-sdk-ec2 (~> 1)
+  aws-sdk-rds (~> 1)
   aws-sdk-s3 (~> 1)
   bootsnap
   brakeman

@@ -1,4 +1,5 @@
 require "spec_helper"
+require "aws-sdk-cloudwatch"
 require_relative "../../../app/services/cloud_provider/adapter"
 
 # Stubbed SDK clients keep discovery coverage independent of Rails, PostgreSQL,
@@ -7,10 +8,12 @@ RSpec.describe CloudProvider::Adapter do
   let(:region) { "us-east-2" }
   let(:ec2) { Aws::EC2::Client.new(region: region, stub_responses: true) }
   let(:s3) { Aws::S3::Client.new(region: region, stub_responses: true) }
+  let(:cloudwatch) { Aws::CloudWatch::Client.new(region: region, stub_responses: true) }
   let(:adapter) do
     described_class.new(
       ec2_client_factory: ->(requested) { expect(requested).to eq(region); ec2 },
-      s3_client_factory: ->(requested) { expect(requested).to eq(region); s3 })
+      s3_client_factory: ->(requested) { expect(requested).to eq(region); s3 },
+      cloudwatch_client_factory: ->(requested) { expect(requested).to eq(region); cloudwatch })
   end
   let(:request_context) { { provider: "aws", region: region, resource_types: %w[ec2 s3] } }
   let(:instance) do
@@ -42,10 +45,11 @@ RSpec.describe CloudProvider::Adapter do
     expect(first[:errors]).to be_empty
     expect(first[:resources]).to eq([
       { provider: "aws", resource_id: "i-rspec", service: "ec2", name: "Course server", region: region,
-        metadata: { instance_type: "t3.micro", state: "running" },
+        metadata: { instance_type: "t3.micro", state: "running", cpu_utilization_pct: nil, estimated_monthly_cost_usd: "7.50" },
         console_url: "https://#{region}.console.aws.amazon.com/ec2/home?region=#{region}#InstanceDetails:instanceId=i-rspec" },
       { provider: "aws", resource_id: "rspec-bucket", service: "s3", name: "rspec-bucket", region: region,
-        metadata: {}, console_url: "https://s3.console.aws.amazon.com/s3/buckets/rspec-bucket?region=#{region}&tab=objects" }
+        metadata: { creation_date: nil, size_bytes: nil, object_count: nil },
+        console_url: "https://s3.console.aws.amazon.com/s3/buckets/rspec-bucket?region=#{region}&tab=objects" }
     ])
     expect(first.to_s).not_to include("private-tag-value", "pinned", "hidden")
     expect(discover("ec2", "s3")).to eq(first)

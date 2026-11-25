@@ -39,13 +39,13 @@ RSpec.describe "Manual scans", type: :request do
       # accidentally exercise the controller's default-types behavior instead.
       post path, params: { resource_types: types }, as: :json
       expect(response).to redirect_to(dashboard_path(environment_id: environment.id))
-      expect(flash[:alert]).to eq("Select valid EC2/S3 resource types.")
+      expect(flash[:alert]).to eq("Select valid inventory resource types.")
       expect(environment.scans).to be_empty
     end
   end
 
-  it "persists a default two-service scan and shows success feedback after redirect" do
-    expect(adapter).to receive(:list_resources).with(provider: "aws", region: environment.region, resource_types: %w[ec2 s3]).and_return(result)
+  it "persists a default inventory scan and shows success feedback after redirect" do
+    expect(adapter).to receive(:list_resources).with(provider: "aws", region: environment.region, resource_types: Resource::SERVICES).and_return(result)
     post path
     expect(response).to redirect_to(dashboard_path(environment_id: environment.id))
     expect(environment.scans.sole).to have_attributes(status: "completed", created_count: 1, discovered_count: 1)
@@ -73,7 +73,7 @@ RSpec.describe "Manual scans", type: :request do
     expect(adapter).not_to receive(:list_resources)
     post path, params: { scan_form: "1" }
     expect(response).to redirect_to(dashboard_path(environment_id: environment.id))
-    expect(flash[:alert]).to eq("Select valid EC2/S3 resource types.")
+    expect(flash[:alert]).to eq("Select valid inventory resource types.")
     expect(environment.scans).to be_empty
   end
 

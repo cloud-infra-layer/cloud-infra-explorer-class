@@ -641,3 +641,104 @@ of incoming personalization keys, and preservation during failed-batch rollback.
 ResourceSync's existing allowlist and identity lookup support these behaviors;
 no production service changes are needed. These tests call persistence directly
 with synthetic normalized records and make no live AWS requests.
+
+---
+
+# 7. Expanded inventory and Cost Explorer contracts
+
+These contracts extend Section 1 for additional inventory services and introduce
+a separate Cost Explorer payload. Demo seeds and live adapters must emit the
+**same** shapes. ResourceSync rejects unknown metadata keys.
+
+## 7.1 Inventory services
+
+`Resource.service` values: `ec2`, `s3`, `rds`, `bedrock`.
+
+Region-scoped identities (`environment_id + provider + service + region + resource_id`):
+`ec2`, `rds`, `bedrock`.
+
+S3 identity remains (`environment_id + provider + service + resource_id`).
+
+### Metadata allowlists (string or null values only)
+
+| service | keys |
+|---|---|
+| `ec2` | `instance_type`, `state`, `cpu_utilization_pct`, `estimated_monthly_cost_usd` |
+| `s3` | `creation_date`, `size_bytes`, `object_count` |
+| `rds` | `engine`, `engine_version`, `instance_class`, `status`, `multi_az`, `storage_gb`, `estimated_monthly_cost_usd` |
+| `bedrock` | `provider_name`, `lifecycle_status`, `input_modalities`, `estimated_monthly_cost_usd` |
+
+### Bedrock resource choice
+
+Inventory rows are **foundation models** returned by `ListFoundationModels`.
+`resource_id` is the model ID (for example `amazon.nova-lite-v1:0`). This keeps
+the adapter aligned with a single Bedrock control-plane API while still supporting
+an equal-weight AI/LLM overview card.
+
+### Adapter enrichment
+
+- EC2 `cpu_utilization_pct` comes from CloudWatch `AWS/EC2` `CPUUtilization`.
+- S3 `size_bytes` / `object_count` come from CloudWatch `AWS/S3`
+  `BucketSizeBytes` (StandardStorage) and `NumberOfObjects` (AllStorageTypes).
+- Missing CloudWatch datapoints yield `null` for those metadata fields without
+  failing the whole service discovery.
+- `estimated_monthly_cost_usd` may be a deterministic estimate from known instance
+  classes, or `null` when unknown. Account-level spend belongs in Cost Explorer.
+
+### Example RDS resource
+
+```ruby
+{
+  provider: "aws",
+  resource_id: "demo-app-db",
+  service: "rds",
+  name: "demo-app-db",
+  region: "us-east-1",
+  metadata: {
+    engine: "postgres",
+    engine_version: "16.3",
+    instance_class: "db.t4g.micro",
+    status: "available",
+    multi_az: "false",
+    storage_gb: "20",
+    estimated_monthly_cost_usd: "12.00"
+  },
+  console_url: "https://us-east-1.console.aws.amazon.com/rds/home?region=us-east-1#database:id=demo-app-db;is-cluster=false"
+}
+```
+
+## 7.2 Cost Explorer contract
+
+Cost data is **not** stored as `Resource` rows. Normalized cost records:
+
+| Field | Type | Description |
+|---|---|---|
+| period_start | Date / ISO date string | Inclusive period start |
+| period_end | Date / ISO date string | Inclusive period end |
+| granularity | String | `DAILY` or `MONTHLY` |
+| service_code | String | Cost Explorer SERVICE dimension value |
+| amount | Decimal / numeric string | Unblended cost amount |
+| currency | String | Currently `USD` |
+
+`CloudProvider::Adapter#list_costs` returns `{ costs:, errors: }` using Cost Explorer
+`GetCostAndUsage` grouped by `SERVICE`. `CostSync` upserts `CostSnapshot` rows for an
+`Environment` using identity
+`period_start + period_end + granularity + service_code`.
+
+Demo `Course demo` remains `us-east-1` and does not need to match the live sandbox region.
+
+## 7.3 Product categories (UI)
+
+Dashboard cards and inventory filters use generic categories rather than one
+nav link per AWS service:
+
+| category key | label | services |
+|---|---|---|
+| `compute` | Compute | `ec2` |
+| `storage` | Storage | `s3` |
+| `databases` | Database | `rds` |
+| `ai` | AI / ML | `bedrock` |
+
+Add future services by extending `Resource::CATEGORIES` (and contracts/adapters),
+not by adding top-nav entries per service. Inventory lives at `/resources` with
+optional `category`, `visibility` (`all`|`visible`|`hidden`), and `pinned` filters.

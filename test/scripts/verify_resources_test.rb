@@ -19,11 +19,11 @@ class VerifyResourcesScriptTest < Minitest::Test
   def test_default_services_and_region
     output, error, status = run_script
     assert status.success?, error
-    assert_equal({ "provider" => "aws", "region" => "us-east-2", "resource_types" => [ "ec2", "s3" ] }, JSON.parse(output)["resources"].first)
+    assert_equal({ "provider" => "aws", "region" => "us-east-2", "resource_types" => %w[ec2 s3 rds bedrock] }, JSON.parse(output)["resources"].first)
   end
 
   def test_service_selection
-    { "ec2" => [ "ec2" ], "s3" => [ "s3" ], "s3,ec2,s3" => [ "s3", "ec2" ] }.each do |selection, expected|
+    { "ec2" => [ "ec2" ], "s3" => [ "s3" ], "s3,ec2,s3" => [ "s3", "ec2" ], "rds,bedrock" => %w[rds bedrock] }.each do |selection, expected|
       output, error, status = run_script("--services", selection)
       assert status.success?, error
       assert_equal expected, JSON.parse(output)["resources"].first["resource_types"]
