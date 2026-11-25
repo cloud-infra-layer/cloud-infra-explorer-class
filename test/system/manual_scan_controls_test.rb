@@ -31,8 +31,7 @@ class ManualScanControlsTest < ActionDispatch::SystemTestCase
       assert_operator page.evaluate_script("document.documentElement.scrollWidth"), :<=,
         page.evaluate_script("window.innerWidth")
       within ".scan-form" do
-        uncheck "EC2"
-        uncheck "S3"
+        Scan::RESOURCE_TYPES.each { |type| uncheck type.upcase }
         click_button "Refresh resources"
         assert_selector "[role=status]", text: "Select at least one service."
         check "S3"

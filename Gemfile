@@ -80,4 +80,3 @@ group :test do
   gem "cucumber-rails", "~> 4.1", require: false
   gem "database_cleaner-active_record", "~> 2.2"
 end
-

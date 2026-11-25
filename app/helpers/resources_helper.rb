@@ -117,5 +117,4 @@ module ResourcesHelper
   def cost_series_legend_label(service_code, provider: "aws")
     "#{provider_label(provider)} #{cost_series_short_label(service_code)}"
   end
-
 end
