@@ -1,6 +1,6 @@
 require "rails_helper"
 
-RSpec.describe "Inventory visibility and ordering", type: :request do
+RSpec.describe "Inventory category filtering and ordering", type: :request do
   let(:environment) { Environment.create!(name: "Visibility examples", provider: "aws", region: "us-east-1") }
 
   def create_resource(identifier, **attributes)
@@ -20,37 +20,34 @@ RSpec.describe "Inventory visibility and ordering", type: :request do
     expect(ScanCoordinator).not_to receive(:new)
   end
 
-  it "defaults missing or blank visibility to visible, with pins before alphabetical names" do
+  it "defaults to all categories with pins before alphabetical names, including hidden rows" do
     create_resource("i-ordinary", name: "Alpha")
     create_resource("i-pin", name: "Zebra", pinned: true)
     create_resource("i-hidden", name: "Hidden", hidden: true, pinned: true)
 
-    [ nil, "", "   ", "visible" ].each do |visibility|
-      get resources_path, params: { visibility: visibility }
-      expect(response).to have_http_status(:ok)
-      expect(listed_names).to eq([ "Zebra", "Alpha" ])
-    end
+    get resources_path
+    expect(response).to have_http_status(:ok)
+    expect(listed_names).to eq([ "Hidden", "Zebra", "Alpha" ])
+    expect(response.body).to include('aria-pressed="true"')
   end
 
-  it "combines hidden visibility with search and service filters and orders hidden pins first" do
+  it "narrows inventory by one or more categories while preserving search" do
     create_resource("i-visible", name: "Web visible")
     create_resource("i-hidden", name: "Web alpha", hidden: true)
-    create_resource("i-hidden-pin", name: "Web zebra", hidden: true, pinned: true)
-    create_resource("i-other", name: "Worker", hidden: true)
     create_resource("web-bucket", name: "Web bucket", service: "s3", hidden: true)
+    create_resource("i-other", name: "Worker")
 
-    get resources_path, params: { visibility: "hidden", service: "ec2", q: "WEB" }
-
+    get resources_path, params: { category: "compute", q: "WEB" }
     expect(response).to have_http_status(:ok)
-    expect(listed_names).to eq([ "Web zebra", "Web alpha" ])
-    expect(Resource.count).to eq(5)
+    expect(listed_names).to eq([ "Web alpha", "Web visible" ])
+
+    get resources_path, params: { categories: %w[storage compute], q: "WEB" }
+    expect(listed_names).to eq([ "Web alpha", "Web bucket", "Web visible" ])
   end
 
-  [ "all", "HIDDEN", [ "hidden" ], { value: "hidden" } ].each do |visibility|
-    it "rejects invalid visibility #{visibility.inspect}" do
-      get resources_path, params: { visibility: visibility }
-      expect(response).to have_http_status(:bad_request)
-    end
+  it "rejects unknown categories" do
+    get resources_path, params: { category: "lambda" }
+    expect(response).to have_http_status(:not_found)
   end
 
   it "keeps identical AWS IDs from different environments separate" do
@@ -61,14 +58,12 @@ RSpec.describe "Inventory visibility and ordering", type: :request do
     second.save!
 
     get resources_path
-    expect(listed_names).to eq([ first.name ])
-    get resources_path, params: { visibility: "hidden" }
-    expect(listed_names).to eq([ second.name ])
+    expect(listed_names).to contain_exactly(first.name, second.name)
   end
 
   it "uses visible inventory for dashboard card counts on both routes" do
-    ordinary = create_resource("i-ordinary", name: "Alpha")
-    pinned = create_resource("i-pinned", name: "Zebra", pinned: true)
+    create_resource("i-ordinary", name: "Alpha")
+    create_resource("i-pinned", name: "Zebra", pinned: true)
     create_resource("i-hidden", hidden: true, pinned: true)
     create_resource("hidden-bucket", service: "s3", hidden: true)
 
@@ -76,11 +71,8 @@ RSpec.describe "Inventory visibility and ordering", type: :request do
       get path
       expect(response).to have_http_status(:ok)
       document = Nokogiri::HTML(response.body)
-      expect(document.css("#ec2-resources tbody tr")).to be_empty
-      expect(document.css(".category-grid table")).to be_empty
-      expect(document.css("a.category-card[href='#{resources_path(service: 'ec2')}'] .resource-count").map { |node| node.text.strip }).to eq([ "2 resources" ])
-      expect(document.css("a.category-card[href='#{resources_path(service: 's3')}'] .resource-count").map { |node| node.text.strip }).to eq([ "0 resources" ])
-      expect(document.css(".category-card .resource-count").map { |node| node.text.strip }).to eq([ "2 resources", "0 resources" ])
+      expect(document.css("a.category-card[href='#{resources_path(category: 'compute')}'] .resource-count").map { |node| node.text.strip }).to eq([ "2 resources" ])
+      expect(document.css("a.category-card[href='#{resources_path(category: 'storage')}'] .resource-count").map { |node| node.text.strip }).to eq([ "0 resources" ])
     end
   end
 
@@ -91,12 +83,9 @@ RSpec.describe "Inventory visibility and ordering", type: :request do
     get dashboard_path
     document = Nokogiri::HTML(response.body)
     expect(response).to have_http_status(:ok)
-    expect(document.css("main table")).to be_empty
-    expect(document.css(".category-card .resource-count").map { |node| node.text.strip }).to eq([ "0 resources", "0 resources" ])
+    expect(document.css(".category-card .resource-count").map { |node| node.text.strip }).to eq([ "0 resources" ] * 4)
 
     get resources_path
-    expect(listed_names).to be_empty
-    get resources_path, params: { visibility: "hidden" }
     expect(listed_names.size).to eq(2)
     expect(Resource.count).to eq(2)
   end

@@ -34,16 +34,16 @@ RSpec.describe "Browsing stored inventory", type: :feature do
 
     visit root_path
 
-    within("a.category-card", text: "EC2 Instances") do
+    within("a.category-card", text: "Compute") do
       expect(page).to have_css(".resource-count", text: "2 resources")
     end
-    within("a.category-card", text: "S3 Buckets") do
+    within("a.category-card", text: "Storage") do
       expect(page).to have_css(".resource-count", text: "1 resource")
     end
 
-    within(".category-grid") { click_link "EC2 Instances" }
+    within(".category-grid") { click_link "Compute" }
     expect(page).to have_css("tbody tr", count: 2)
-    expect(page).to have_css("td.resource-identifier", text: first.resource_id, count: 2)
+    expect(page).to have_css(".resource-details-list dd.resource-identifier", text: first.resource_id, count: 2, visible: :all)
 
     visit resources_path(service: "s3")
     expect(page).to have_css("tbody tr", count: 1)
@@ -56,32 +56,33 @@ RSpec.describe "Browsing stored inventory", type: :feature do
     environment.resources.create!(bucket_attributes)
 
     visit root_path
-    within(".category-grid") { click_link "EC2 Instances" }
+    within(".category-grid") { click_link "Compute" }
 
-    expect(page).to have_current_path(resources_path(service: "ec2"))
-    expect(page).to have_css("h1", text: "EC2 Resources")
+    expect(page).to have_current_path(resources_path(category: "compute"))
+    expect(page).to have_css(".inventory-category.is-active", text: "Compute")
+    expect(page).not_to have_css("h1")
     within("table.resource-table") do
       expect(page).to have_css("tbody tr", count: 1)
       expect(page).to have_text("Course web server")
-      expect(page).to have_text("Instance type: t3.micro · State: running")
+      expect(page).to have_css(".resource-details-summary")
       expect(page).not_to have_text("Course assets")
     end
 
-    within("nav[aria-label='Primary navigation']") { click_link "S3 Resources" }
+    visit resources_path(category: "storage")
 
-    expect(page).to have_current_path(resources_path(service: "s3"))
+    expect(page).to have_current_path(resources_path(category: "storage"))
+    expect(page).to have_css(".inventory-category.is-active", text: "Storage")
+    expect(page).not_to have_css("h1")
     within("table.resource-table") do
       expect(page).to have_css("tbody tr", count: 1)
       expect(page).to have_text("Course assets")
-      expect(page).to have_text("Unknown")
-      expect(page).to have_text("No metadata available")
       expect(page).not_to have_text("Course web server")
     end
 
-    click_link "Back to dashboard"
+    click_link "Back to overview"
     expect(page).to have_current_path(root_path)
-    within(".category-grid") { click_link "S3 Buckets" }
-    expect(page).to have_css("h1", text: "S3 Resources")
+    within(".category-grid") { click_link "Storage" }
+    expect(page).to have_css(".inventory-category.is-active", text: "Storage")
   end
 
   it "keeps an empty category accessible beside populated inventory" do
@@ -89,31 +90,31 @@ RSpec.describe "Browsing stored inventory", type: :feature do
 
     visit root_path
 
-    within("a.category-card", text: "EC2 Instances") do
+    within("a.category-card", text: "Compute") do
       expect(page).to have_css(".resource-count", text: "1 resource")
     end
-    within("a.category-card", text: "S3 Buckets") do
+    within("a.category-card", text: "Storage") do
       expect(page).to have_css(".resource-count", text: "0 resources")
       expect(page).to have_text("No stored resources yet.")
     end
-    within(".category-grid") { click_link "S3 Buckets" }
-    expect(page).to have_text("No S3 resources found.")
+    within(".category-grid") { click_link "Storage" }
+    expect(page).to have_text("No resources match the current filters.")
     expect(page).not_to have_css("table")
   end
 
   it "guides users through an entirely empty inventory" do
     visit root_path
 
-    expect(page).to have_css(".category-card .resource-count", text: "0 resources", count: 2)
-    expect(page).to have_css(".category-card .category-description", text: "No stored resources yet.", count: 2)
+    expect(page).to have_css(".category-card .resource-count", text: "0 resources", count: 4)
+    expect(page).to have_css(".category-card .category-insight", text: "No stored resources yet.", count: 4)
     expect(page).not_to have_css("table")
 
-    within(".category-grid") { click_link "EC2 Instances" }
-    expect(page).to have_text("No EC2 resources found.")
+    within(".category-grid") { click_link "Compute" }
+    expect(page).to have_text("No resources match the current filters.")
     expect(page).not_to have_css("table")
 
     visit resources_path
-    expect(page).to have_text("No resources found.")
+    expect(page).to have_text("No resources match the current filters.")
     expect(page).not_to have_css("table")
   end
 
@@ -128,13 +129,13 @@ RSpec.describe "Browsing stored inventory", type: :feature do
     sync.call(resources: [ updated, bucket_attributes ])
     visit root_path
 
-    within("a.category-card", text: "EC2 Instances") do
+    within("a.category-card", text: "Compute") do
       expect(page).to have_css(".resource-count", text: "1 resource")
     end
-    within("a.category-card", text: "S3 Buckets") do
+    within("a.category-card", text: "Storage") do
       expect(page).to have_css(".resource-count", text: "1 resource")
     end
-    within(".category-grid") { click_link "EC2 Instances" }
+    within(".category-grid") { click_link "Compute" }
     expect(page).to have_text("Renamed web server")
     expect(page).not_to have_text("Course web server")
     expect(page).to have_css("tbody tr", count: 1)
@@ -156,14 +157,14 @@ RSpec.describe "Browsing stored inventory", type: :feature do
     end.to raise_error(ResourceSync::Error) { |error| expect(error.code).to eq("invalid_resource") }
 
     visit root_path
-    within("a.category-card", text: "EC2 Instances") do
+    within("a.category-card", text: "Compute") do
       expect(page).to have_css(".resource-count", text: "1 resource")
     end
-    within("a.category-card", text: "S3 Buckets") do
+    within("a.category-card", text: "Storage") do
       expect(page).to have_css(".resource-count", text: "0 resources")
     end
 
-    within(".category-grid") { click_link "EC2 Instances" }
+    within(".category-grid") { click_link "Compute" }
     expect(page).to have_text("Course web server")
     expect(page).not_to have_text("Uncommitted rename")
     expect(page).not_to have_text("Course assets")

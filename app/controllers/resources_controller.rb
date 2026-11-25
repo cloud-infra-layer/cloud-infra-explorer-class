@@ -3,28 +3,26 @@ class ResourcesController < ApplicationController
 
   def index
     service = params[:service]
-    raise ActionController::RoutingError, "Not Found" if service.present? && !%w[ec2 s3].include?(service)
+    raise ActionController::RoutingError, "Not Found" if service.present? && !Resource::SERVICES.include?(service)
 
     query = params[:q]
     return head :bad_request unless query.nil? || query.is_a?(String)
-    visibility = params[:visibility]
-    return head :bad_request unless visibility.nil? || visibility.is_a?(String)
-    @visibility = visibility.presence || "visible"
-    return head :bad_request unless %w[visible hidden].include?(@visibility)
-    pinned = params[:pinned]
-    return head :bad_request unless [ nil, "", "1" ].include?(pinned)
 
     @query = query.to_s.strip
     @service = service
-    @pinned_only = @visibility == "visible" && pinned == "1"
+    @selected_categories = selected_categories
+    @category_filter_active = category_filter_active?
     @listing_filters = listing_filters
     @personalization_enabled = personalization_enabled?
+    @page_title = "Inventory"
 
-    @page_title = service.present? ? "#{service.upcase} Resources" : "Resources"
     @resources = Resource.where(provider: "aws")
-    @resources = @visibility == "hidden" ? @resources.hidden : @resources.visible
-    @resources = @resources.where(pinned: true) if @pinned_only
-    @resources = @resources.where(service: service) if service.present?
+    if @service.present?
+      @resources = @resources.where(service: @service)
+    else
+      services = @selected_categories.flat_map { |key| Resource.services_for_category(key) }
+      @resources = @resources.where(service: services)
+    end
     @resources = @resources.search(@query).pinned_first
   end
 
@@ -63,16 +61,42 @@ class ResourcesController < ApplicationController
     redirect_to resources_path(listing_filters), status: :see_other, notice: message
   end
 
+  def selected_categories
+    requested = requested_categories
+    return Resource::CATEGORIES.keys if requested.empty?
+
+    invalid = requested - Resource::CATEGORIES.keys
+    raise ActionController::RoutingError, "Not Found" if invalid.any?
+
+    requested
+  end
+
+  def requested_categories
+    values = []
+    values.concat(Array(params[:categories]))
+    values << params[:category] if params[:category].present?
+    values.map(&:to_s).uniq
+  end
+
+  def category_filter_active?
+    requested_categories.any?
+  end
+
   def listing_filters
     filters = {}
     query = params[:q]
     filters[:q] = query.strip if query.is_a?(String) && query.strip.present?
-    filters[:service] = params[:service] if %w[ec2 s3].include?(params[:service])
-    if params[:visibility] == "hidden"
-      filters[:visibility] = "hidden"
-    elsif [ nil, "", "visible" ].include?(params[:visibility]) && params[:pinned] == "1"
-      filters[:pinned] = "1"
+    filters[:service] = params[:service] if Resource::SERVICES.include?(params[:service])
+
+    categories = requested_categories.select { |key| Resource::CATEGORIES.key?(key) }
+    if categories.any?
+      if categories.size == 1
+        filters[:category] = categories.first
+      else
+        filters[:categories] = categories
+      end
     end
+
     filters
   end
 end

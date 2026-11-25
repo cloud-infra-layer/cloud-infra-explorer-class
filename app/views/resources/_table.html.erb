@@ -1,14 +1,13 @@
 <div class="resource-table-scroll" role="region" aria-label="Resource inventory table" tabindex="0">
   <table class="resource-table">
-    <caption><%= caption %> — stored inventory across all environments</caption>
     <thead>
       <tr>
-        <th scope="col">Resource name</th>
+        <th scope="col">Name</th>
+        <th scope="col">Category</th>
+        <th scope="col">Provider</th>
         <th scope="col">Service</th>
         <th scope="col">Region</th>
-        <th scope="col">Resource ID</th>
         <th scope="col">Metadata</th>
-        <th scope="col">Status</th>
         <% if personalization_enabled %>
           <th scope="col">Actions</th>
         <% end %>
@@ -16,26 +15,79 @@
     </thead>
     <tbody>
       <% resources.each do |resource| %>
-        <tr>
+        <% row_classes = [ "resource-row" ]
+           row_classes << "resource-row--pinned" if resource.pinned?
+           row_classes << "resource-row--hidden" if resource.hidden?
+           entries = resource_metadata_entries(resource) %>
+        <tr class="<%= row_classes.join(" ") %>">
           <th scope="row"><%= resource.name %></th>
-          <td><%= resource.service.upcase %></td>
+          <td><%= category_label(resource.service) %></td>
+          <td><%= provider_label(resource.provider) %></td>
+          <td><%= service_label(resource.service) %></td>
           <td><%= resource.region.presence || "Unknown" %></td>
-          <td class="resource-identifier"><%= resource.resource_id %></td>
-          <td><%= resource_metadata(resource) %></td>
-          <td><%= resource.hidden? ? "Hidden" : (resource.pinned? ? "Pinned" : "Unpinned") %></td>
+          <td class="resource-details-cell">
+            <details class="resource-details">
+              <summary class="resource-details-summary" aria-label="Toggle metadata for <%= resource.name %>">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.8"/>
+                  <path d="M12 10.5v6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                  <circle cx="12" cy="7.5" r="1.2" fill="currentColor"/>
+                </svg>
+              </summary>
+              <dl class="resource-details-list">
+                <% entries.each do |label, value| %>
+                  <div>
+                    <dt><%= label %></dt>
+                    <dd class="<%= 'resource-identifier' if label == 'Resource ID' %>"><%= value %></dd>
+                  </div>
+                <% end %>
+              </dl>
+            </details>
+          </td>
           <% if personalization_enabled %>
             <td>
               <div class="resource-actions">
-                <% actions = if resource.hidden?
-                  { "Restore" => restore_resource_path(resource) }
-                else
-                  pin_action = resource.pinned? ? { "Unpin" => unpin_resource_path(resource) } : { "Pin" => pin_resource_path(resource) }
-                  pin_action.merge("Hide" => hide_resource_path(resource))
-                end %>
-                <% actions.each do |label, path| %>
-                  <%= button_to label, path, method: :patch, params: listing_filters,
-                      class: "inventory-button", form: { data: { turbo: false } },
-                      aria: { label: "#{label} #{resource.name} (#{resource.resource_id})" } %>
+                <% unless resource.hidden? %>
+                  <% if resource.pinned? %>
+                    <%= button_to unpin_resource_path(resource), method: :patch, params: listing_filters,
+                          class: "icon-action icon-action--pin is-active",
+                          form: { data: { turbo: false } },
+                          aria: { label: "Unpin #{resource.name}" } do %>
+                      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                        <path d="M14.5 3.5 20.5 9.5 15 15l-1.5 5.5L9 16l-5 5-1.4-1.4 5-5-4.5-4.5L9 9.5 14.5 3.5Z" fill="currentColor"/>
+                      </svg>
+                    <% end %>
+                  <% else %>
+                    <%= button_to pin_resource_path(resource), method: :patch, params: listing_filters,
+                          class: "icon-action icon-action--pin",
+                          form: { data: { turbo: false } },
+                          aria: { label: "Pin #{resource.name}" } do %>
+                      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                        <path d="M14.5 3.5 20.5 9.5 15 15l-1.5 5.5L9 16l-5 5-1.4-1.4 5-5-4.5-4.5L9 9.5 14.5 3.5Z"
+                          fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+                      </svg>
+                    <% end %>
+                  <% end %>
+
+                  <%= button_to hide_resource_path(resource), method: :patch, params: listing_filters,
+                        class: "icon-action icon-action--hide",
+                        form: { data: { turbo: false } },
+                        aria: { label: "Hide #{resource.name}" } do %>
+                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                      <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z" fill="none" stroke="currentColor" stroke-width="1.8"/>
+                      <circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.8"/>
+                    </svg>
+                  <% end %>
+                <% else %>
+                  <%= button_to restore_resource_path(resource), method: :patch, params: listing_filters,
+                        class: "icon-action icon-action--restore",
+                        form: { data: { turbo: false } },
+                        aria: { label: "Show #{resource.name}" } do %>
+                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                      <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z" fill="none" stroke="currentColor" stroke-width="1.8"/>
+                      <path d="M4 4l16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                    </svg>
+                  <% end %>
                 <% end %>
               </div>
             </td>

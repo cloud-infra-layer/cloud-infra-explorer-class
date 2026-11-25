@@ -2,15 +2,29 @@ require "test_helper"
 
 class ResourcesControllerTest < ActionDispatch::IntegrationTest
   test "resource index and supported categories render inventory" do
-    { nil => "Resources", "ec2" => "EC2 Resources", "s3" => "S3 Resources" }.each do |service, title|
+    [ nil, "ec2", "s3" ].each do |service|
       get resources_url, params: { service: service }
 
       assert_response :success
-      assert_select "h1", title
-      assert_select "h2", "Stored inventory"
+      assert_select "h1", count: 0
       assert_select "table.resource-table", count: 1
-      assert_select "a[href=?]", root_path, text: "Back to dashboard"
+      assert_select "caption", count: 0
+      assert_select "th", "Provider"
+      assert_select "th", "Metadata"
+      assert_select "th", text: "ID", count: 0
+      assert_select "th", text: "Status", count: 0
+      assert_select ".inventory-category", count: Resource::CATEGORIES.size
+      assert_select "a[href=?]", root_path, text: "Back to overview"
     end
+  end
+
+  test "category filter maps to grouped services" do
+    get resources_url, params: { category: "compute" }
+
+    assert_response :success
+    assert_select "h1", count: 0
+    assert_select "tbody th", resources(:web_server).name
+    assert_select "tbody th", text: resources(:assets_bucket).name, count: 0
   end
 
   test "unsupported service returns not found" do
@@ -20,8 +34,10 @@ class ResourcesControllerTest < ActionDispatch::IntegrationTest
     end
   end
 
-  test "each category displays only matching database records and metadata" do
-    resources(:assets_bucket).update!(metadata: { purpose: "Static assets" })
+  test "each service displays only matching database records and metadata" do
+    resources(:assets_bucket).update!(
+      metadata: { creation_date: "2026-01-01T00:00:00Z", size_bytes: "10", object_count: "2" }
+    )
 
     { "ec2" => :web_server, "s3" => :assets_bucket }.each do |service, fixture|
       resource = resources(fixture)
@@ -30,10 +46,12 @@ class ResourcesControllerTest < ActionDispatch::IntegrationTest
       assert_response :success
       assert_select "tbody tr", count: Resource.where(provider: "aws", service: service).count
       assert_select "tbody th", resource.name
-      assert_select "tbody td", resource.resource_id
       assert_select "tbody td", service.upcase
       assert_select "tbody td", resource.region.presence || "Unknown"
-      assert_select "tbody td", text: service == "ec2" ? "Instance type: t3.micro · State: running" : "Purpose: Static assets"
+      assert_select ".resource-details-summary"
+      assert_select ".resource-details-list dt", "Resource ID"
+      assert_select ".resource-details-list dd", resource.resource_id
+      assert_select ".resource-details-list dt", service == "ec2" ? "Instance type" : "Created"
       other = service == "ec2" ? resources(:assets_bucket) : resources(:web_server)
       assert_select "tbody th", text: other.name, count: 0
     end
@@ -53,18 +71,12 @@ class ResourcesControllerTest < ActionDispatch::IntegrationTest
     assert_select "tbody th", resources(:assets_bucket).name
   end
 
-  test "empty categories show helpful messages instead of a table" do
-    %w[ec2 s3].each do |service|
-      Resource.where(service: service).delete_all
-      get resources_url, params: { service: service }
-
-      assert_response :success
-      assert_select ".empty-state", "No #{service.upcase} resources found."
-      assert_select "table", count: 0
-    end
-
+  test "empty filters show a helpful message instead of a table" do
+    Resource.delete_all
     get resources_url
-    assert_select ".empty-state", "No resources found."
+
+    assert_response :success
+    assert_select ".empty-state", "No resources match the current filters."
     assert_select "table", count: 0
   end
 
@@ -75,7 +87,6 @@ class ResourcesControllerTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_select "tbody td", "Unknown"
-    assert_select "tbody td", "No metadata available"
   end
 
   test "resource fields and metadata are escaped" do
@@ -87,8 +98,8 @@ class ResourcesControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_select "tbody script", count: 0
     assert_select "tbody th", html
-    assert_select "tbody td", text: html, count: 2
-    assert_select "tbody td", "State: #{html}"
+    assert_select "tbody td", text: html, count: 1
+    assert_select ".resource-details-list dd", text: html, count: 2
     assert_includes response.body, "&lt;script&gt;"
   end
 
@@ -102,5 +113,16 @@ class ResourcesControllerTest < ActionDispatch::IntegrationTest
     assert_select "tbody th", resources(:assets_bucket).name
   ensure
     original_values&.each { |key, value| ENV[key] = value }
+  end
+
+  test "default inventory includes hidden rows with category chips selected" do
+    resources(:web_server).update!(hidden: true)
+
+    get resources_url
+
+    assert_response :success
+    assert_select "tr.resource-row--hidden th", resources(:web_server).name
+    assert_select ".inventory-category.is-active", count: Resource::CATEGORIES.size
+    assert_select "tbody td", "AWS"
   end
 end
