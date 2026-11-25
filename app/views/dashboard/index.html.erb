@@ -102,7 +102,7 @@
 <% end %>
 
 <% if @cost_chart[:periods].any? %>
-  <section class="content-panel cost-panel" aria-labelledby="cost-overview-heading">
+  <section id="cost-explorer" class="content-panel cost-panel" aria-labelledby="cost-overview-heading">
     <h2 id="cost-overview-heading">Cost Explorer</h2>
     <%= render "cost_chart", cost_chart: @cost_chart %>
   </section>

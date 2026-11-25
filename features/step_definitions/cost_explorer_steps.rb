@@ -1,5 +1,5 @@
 Given("the application contains monthly cost snapshots for the demo environment") do
-  environment = Environment.find_or_create_by!(name: "Cucumber Testing") do |env|
+  environment = Environment.find_or_create_by!(name: "AWS Sandbox") do |env|
     env.provider = "aws"
     env.region = "us-east-1"
   end
@@ -48,4 +48,37 @@ end
 
 When("I choose the cost chart range {string}") do |label|
   within(".cost-chart-ranges") { click_link label }
+end
+
+Given("another environment has different monthly spend") do
+  sibling = Environment.find_or_create_by!(name: "Sibling Sandbox") do |env|
+    env.provider = "aws"
+    env.region = "us-west-2"
+  end
+
+  CostSnapshot.where(environment: sibling).delete_all
+  sibling.cost_snapshots.create!(
+    period_start: Date.new(2026, 11, 1),
+    period_end: Date.new(2026, 11, 30),
+    granularity: "MONTHLY",
+    service_code: "Amazon Simple Storage Service",
+    amount: "12.00",
+    currency: "USD"
+  )
+end
+
+When("I visit the dashboard for the demo environment") do
+  environment = Environment.find_by!(name: "AWS Sandbox")
+  visit root_path(environment_id: environment.id)
+end
+
+When("I visit the dashboard for the sibling environment") do
+  environment = Environment.find_by!(name: "Sibling Sandbox")
+  visit root_path(environment_id: environment.id)
+end
+
+Then("the monthly spend should be {string}") do |amount|
+  within(".stat-card", text: "Monthly spend") do
+    expect(page).to have_css(".stat-value", text: amount)
+  end
 end

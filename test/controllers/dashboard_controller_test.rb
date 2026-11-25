@@ -162,6 +162,40 @@ class DashboardControllerTest < ActionDispatch::IntegrationTest
     assert_select ".cost-chart-legend", text: /AWS Bedrock/
   end
 
+  test "cost explorer uses the selected environment and ignores sibling environment spend" do
+    CostSnapshot.delete_all
+    selected = environments(:course_development)
+    other = environments(:course_testing)
+
+    selected.cost_snapshots.create!(
+      period_start: Date.new(2026, 11, 1),
+      period_end: Date.new(2026, 11, 30),
+      granularity: "MONTHLY",
+      service_code: "Amazon Bedrock",
+      amount: "50.00",
+      currency: "USD"
+    )
+    other.cost_snapshots.create!(
+      period_start: Date.new(2026, 11, 1),
+      period_end: Date.new(2026, 11, 30),
+      granularity: "MONTHLY",
+      service_code: "Amazon Bedrock",
+      amount: "999.00",
+      currency: "USD"
+    )
+
+    get dashboard_url, params: { environment_id: selected.id }
+
+    assert_response :success
+    assert_select ".stat-card:nth-child(1) .stat-value span", "$50.00"
+    assert_select ".stat-card:nth-child(1) .stat-value span", text: "$1049.00", count: 0
+
+    get dashboard_url, params: { environment_id: other.id }
+
+    assert_response :success
+    assert_select ".stat-card:nth-child(1) .stat-value span", "$999.00"
+  end
+
   private
 
   def assert_category_card(category, name, count)

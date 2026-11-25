@@ -10,13 +10,13 @@
 <% plot_width = 920 %>
 <% chart_width = padding_left + plot_width + padding_right %>
 <% chart_height = padding_top + plot_height + padding_bottom %>
-<% range_query = request.query_parameters.slice("environment_id") %>
+<% range_query = request.query_parameters.slice("environment_id").to_h.symbolize_keys %>
 
 <figure class="cost-chart" data-controller="cost-chart" aria-labelledby="cost-overview-heading">
   <nav class="cost-chart-ranges" aria-label="Cost time range">
     <% ResourcesHelper::COST_RANGE_OPTIONS.each do |label, value| %>
       <%= link_to label,
-            root_path(range_query.merge("cost_range" => value)),
+            root_path(range_query.merge(cost_range: value, anchor: "cost-explorer")),
             class: [ "cost-chart-range", ("is-active" if cost_chart.fetch(:range) == value) ],
             aria: { current: (cost_chart.fetch(:range) == value ? "page" : nil) } %>
     <% end %>

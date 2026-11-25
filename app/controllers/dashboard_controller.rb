@@ -5,17 +5,17 @@ class DashboardController < ApplicationController
     visible = Resource.where(provider: "aws", service: Resource::SERVICES).visible
     @category_insights = build_category_insights(visible)
 
-    @cost_range = COST_RANGES.include?(params[:cost_range].to_s) ? params[:cost_range].to_s : "6M"
-    full_chart = build_cost_chart("MAX")
-    @cost_chart = build_cost_chart(@cost_range)
-    @cost_insights = build_cost_insights(full_chart)
-
     @scan_enabled = ENV["ENABLE_MANUAL_SCANS"] == "true"
 
     environments = Environment.order(:name, :id)
     @scan_environments = environments.to_a if @scan_enabled
     @connected_environment = (@scan_environments || environments).find { |environment| environment.id.to_s == params[:environment_id] } ||
       environments.find_by(name: "AWS Sandbox") || environments.first
+
+    @cost_range = COST_RANGES.include?(params[:cost_range].to_s) ? params[:cost_range].to_s : "6M"
+    full_chart = build_cost_chart("MAX", environment: @connected_environment)
+    @cost_chart = build_cost_chart(@cost_range, environment: @connected_environment)
+    @cost_insights = build_cost_insights(full_chart)
 
     return unless @connected_environment
 
@@ -64,12 +64,13 @@ class DashboardController < ApplicationController
     ActiveSupport::NumberHelper.number_to_delimited(number)
   end
 
-  def build_cost_chart(range)
-    snapshots = CostSnapshot
-      .joins(:environment)
-      .where(environments: { provider: "aws" }, granularity: "MONTHLY")
-      .includes(:environment)
+  def build_cost_chart(range, environment:)
+    return { periods: [], series: [], range: range } if environment.nil?
+
+    snapshots = environment.cost_snapshots
+      .where(granularity: "MONTHLY")
       .order(:period_start, :service_code)
+      .to_a
 
     return { periods: [], series: [], range: range } if snapshots.empty?
 
@@ -78,14 +79,11 @@ class DashboardController < ApplicationController
 
     service_codes = snapshots.map(&:service_code).uniq.sort
     amounts = snapshots.index_by { |snapshot| [ snapshot.period_start, snapshot.service_code ] }
-    providers = snapshots.each_with_object({}) do |snapshot, memo|
-      memo[snapshot.service_code] ||= snapshot.environment.provider
-    end
 
     series = service_codes.map do |service_code|
       {
         service_code: service_code,
-        provider: providers.fetch(service_code, "aws"),
+        provider: environment.provider,
         values: periods.map { |period| amounts[[ period, service_code ]]&.amount.to_f }
       }
     end
