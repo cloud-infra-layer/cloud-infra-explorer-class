@@ -7,6 +7,10 @@ class ManualScanControlsTest < ActionDispatch::SystemTestCase
   end
 
   setup do
+    # Close the browser on reset rather than using Capybara's wildcard CDP
+    # cleanup, which newer Chrome versions reject. Preserve test isolation.
+    page.driver.define_singleton_method(:reset!) { quit }
+
     @previous_enable_manual_scans = ENV["ENABLE_MANUAL_SCANS"]
     ENV["ENABLE_MANUAL_SCANS"] = "true"
   end
