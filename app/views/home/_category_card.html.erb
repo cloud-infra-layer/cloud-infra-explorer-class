@@ -5,10 +5,11 @@
   </div>
   <p class="resource-count"><%= pluralize(count, "resource") %></p>
   <p class="category-insight"><%= insight %></p>
-  <% if count.positive? && pinned.positive? %>
-    <p class="category-meta"><%= pluralize(pinned, "pinned") %></p>
-  <% elsif count.positive? %>
-    <p class="category-meta"><%= description %></p>
+  <% if count.positive? %>
+    <p class="category-description"><%= description %></p>
+    <% if pinned.positive? %>
+      <p class="category-meta category-pinned"><%= pinned %> Pinned</p>
+    <% end %>
   <% end %>
   <span class="category-action">View <%= name %> <span aria-hidden="true">&rarr;</span></span>
 <% end %>

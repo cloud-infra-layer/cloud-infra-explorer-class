@@ -144,7 +144,7 @@ p { margin: 0 0 1rem; }
   border-radius: 999px;
   flex: 0 0 auto;
 }
-.category-card { display: block; color: inherit; text-decoration: none; }
+.category-card { display: flex; flex-direction: column; color: inherit; text-decoration: none; }
 .category-card:hover { border-color: #175bb5; box-shadow: 0 4px 12px rgb(20 36 59 / 8%); }
 .category-card-header {
   display: flex;
@@ -173,7 +173,9 @@ p { margin: 0 0 1rem; }
 .category-insight { color: #14243b; font-weight: 600; margin-bottom: 0.35rem; }
 .category-meta,
 .category-description { color: #526176; margin-bottom: 0.85rem; }
-.category-action { color: #175bb5; font-weight: 600; }
+.category-card .category-description { margin-bottom: 0.35rem; }
+.category-pinned { font-size: inherit; font-weight: 500; }
+.category-action { color: #175bb5; font-weight: 600; margin-top: auto; padding-top: 0.5rem; }
 .category-card:hover .category-action { text-decoration: underline; }
 
 .resource-table-scroll { max-width: 100%; overflow-x: auto; margin-bottom: 1.5rem; }
