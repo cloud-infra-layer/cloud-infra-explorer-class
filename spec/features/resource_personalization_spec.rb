@@ -53,6 +53,28 @@ RSpec.describe "Managing the shared inventory", type: :feature do
     expect(page).not_to have_css("tr.resource-row--pinned", text: "Team web server")
   end
 
+  it "preserves the overview description when pinning and unpinning a resource" do
+    visit resources_path(category: "compute")
+    click_action("Pin", "Team web server")
+    click_link "Back to overview"
+
+    within("a.category-card", text: "Compute") do
+      expect(page).to have_css(".category-description", text: "Virtual machines and instance capacity.")
+      expect(page).to have_css(".category-insight", text: "0 running · 0 stopped")
+      expect(page).to have_css(".category-pinned", exact_text: "1 Pinned")
+    end
+
+    click_link "View Compute"
+    click_action("Unpin", "Team web server")
+    click_link "Back to overview"
+
+    within("a.category-card", text: "Compute") do
+      expect(page).to have_css(".category-description", text: "Virtual machines and instance capacity.")
+      expect(page).to have_css(".category-insight", text: "0 running · 0 stopped")
+      expect(page).not_to have_css(".category-pinned")
+    end
+  end
+
   it "lets users multi-select categories from the inventory chips" do
     visit resources_path
     click_link "Compute"
