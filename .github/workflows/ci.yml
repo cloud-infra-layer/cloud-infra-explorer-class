@@ -147,17 +147,8 @@ jobs:
         with:
           bundler-cache: true
 
-      # Capybara 3.40 uses a wildcard origin during Chrome session cleanup.
-      - name: Set up Chrome
-        id: setup-chrome
-        uses: browser-actions/setup-chrome@v2
-        with:
-          chrome-version: '157'
-          install-chromedriver: true
-
       - name: Run System Tests
         env:
-          CHROME_BIN: ${{ steps.setup-chrome.outputs.chrome-path }}
           RAILS_ENV: test
           DATABASE_URL: postgres://postgres:postgres@localhost:5432
           # RAILS_MASTER_KEY: ${{ secrets.RAILS_MASTER_KEY }}
