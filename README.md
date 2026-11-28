@@ -1,6 +1,6 @@
 # Cloud Infrastructure Explorer
 
-Cloud Infrastructure Explorer is a shared AWS inventory dashboard that helps teams find important EC2 instances and S3 buckets, prioritize frequently used resources, and hide distracting inventory without modifying AWS infrastructure.
+Cloud Infrastructure Explorer is a shared AWS inventory dashboard that helps teams browse multi-service resources by category, prioritize what they use most, hide distracting inventory, and review monthly spend trends—without modifying AWS infrastructure.
 
 The project is being developed by a four-person team for Columbia University's COMS W4152: Engineering Software-as-a-Service.
 
@@ -12,18 +12,18 @@ The project is being developed by a four-person team for Columbia University's C
 > **Note for Teaching Staff (Iteration 2):**
 > Evaluating this product does **NOT** require an AWS account or AWS credentials.
 > The Heroku deployment is a seeded demo (`Course demo` environment in PostgreSQL).
-> Browse EC2/S3 inventory, search/filter, and pin/hide/restore without signing in.
-> **Refresh resources** is intentionally **disabled** on Heroku for Iteration 2
-> (`ENABLE_MANUAL_SCANS` off) until live AWS refresh is productized in a later
-> iteration. Automated RSpec and Cucumber suites still cover scan behavior with
-> mocked AWS responses when that flag is enabled in test.
+> Browse category inventory, search/filter, pin/hide/restore, and review Cost Explorer
+> without signing in. **Refresh resources** is intentionally **disabled** on Heroku
+> for Iteration 2 (`ENABLE_MANUAL_SCANS` off) until live AWS refresh is productized
+> later. Automated RSpec and Cucumber suites still cover scan behavior with mocked
+> AWS responses when that flag is enabled in test.
 
 ### What to try on Heroku
 
 1. Open the deployment link above.
-2. Open **EC2 Resources** or **S3 Buckets**, then search by name, service, or AWS ID.
-3. Pin, unpin, hide, and restore resources (shared team preferences; no login).
-4. Use the dedicated pinned and hidden inventory views.
+2. On **Overview**, review category cards and the Cost Explorer chart (try the time ranges).
+3. Open a category card or **Inventory**, then search and multi-select category filters.
+4. Pin, unpin, hide, and restore resources (shared team preferences; no login). Pinned rows sort first; hidden rows stay in the table for restore.
 
 Do not expect a working **Refresh resources** control on the live demo for this
 iteration. A stored demo environment is not proof of a connected AWS account.
@@ -39,14 +39,13 @@ shared team view, not individual user accounts, and do not change resources in A
 
 | Capability | Current status |
 |---|---|
-| Browse stored EC2/S3 inventory and metadata | Available through category listings and dashboard counts |
-| Search by name, service, or AWS resource ID | Implemented with category filtering and a basic search form |
-| Shared pin/unpin and hide/restore | Implemented with feature-flagged UI controls and persistent shared preferences |
-| Focus on important inventory | Pinned resources appear first, with a dedicated pinned view and dashboard shortcut; hidden resources are excluded from normal listings and counts |
-| Find hidden resources | Dedicated hidden inventory view supports restoring resources without modifying AWS infrastructure |
-| Read-only EC2/S3 discovery | Adapter implemented and covered by tests; not required for Iteration 2 demo evaluation |
+| Browse multi-service inventory by category | Overview cards and a single Inventory listing for Compute, Storage, Database, and AI / ML (EC2, S3, RDS, Bedrock) |
+| Cost Explorer on Overview | Env-scoped monthly spend insights (MoM/YoY) and multi-service chart with time ranges |
+| Search by name, service, or AWS resource ID | Implemented with multi-select category chips |
+| Shared pin/unpin and hide/restore | Feature-flagged UI; pinned rows sort first; hide/restore without changing AWS |
+| Read-only discovery | Adapter covers EC2/S3/RDS/Bedrock; not required for Iteration 2 demo evaluation |
 | Persist scan results and scan history | ScanCoordinator and ResourceSync implemented, including partial/failure handling |
-| Manual refresh (Refresh resources) | Implemented behind `ENABLE_MANUAL_SCANS`; **off on Heroku for Iteration 2**; covered by Cucumber/RSpec with mocked AWS |
+| Manual refresh (Refresh resources) | Behind `ENABLE_MANUAL_SCANS`; **off on Heroku for Iteration 2**; covered by Cucumber/RSpec with mocked AWS |
 
 **Team sandbox region:** `us-east-2` (US East, Ohio), where the team's AWS test sandbox is set up. The adapter scans the region supplied in `connection_context`; it is not restricted to the sandbox region.
 
@@ -75,7 +74,7 @@ is not required to evaluate the Iteration 2 Heroku demo.
 | HTML / CSS / JavaScript | Frontend |
 | Git / GitHub | Version control and collaboration |
 | GitHub Actions | Continuous integration |
-| AWS SDK for Ruby | Read-only EC2 and S3 resource discovery |
+| AWS SDK for Ruby | Read-only discovery (EC2, S3, RDS, Bedrock) and Cost Explorer |
 
 ## Local Development Setup
 
@@ -250,10 +249,10 @@ bin/rails test
 ```bash
 bundle exec cucumber
 ```
-*(16 acceptance scenarios: dashboard browsing, search/filtering, pin/unpin,
-hide/restore, plus successful and failed manual scans with mocked AWS. Scan
-scenarios enable `ENABLE_MANUAL_SCANS` in the test process; they do not require
-live AWS or the Heroku refresh control.)*
+*(22 acceptance scenarios: overview/categories, Cost Explorer, inventory search
+and filters, pin/hide/restore, plus successful and failed manual scans with
+mocked AWS. Scan scenarios enable `ENABLE_MANUAL_SCANS` in the test process;
+they do not require live AWS or the Heroku refresh control.)*
 
 **4. Rails system-test runner**:
 
@@ -439,9 +438,17 @@ After preparing the development database, load fictional resources with:
 bin/rails db:seed
 ```
 
-Open `/` or `/dashboard` on the running Rails server to view stored EC2 and S3 resources across all environments. Loading seeds and viewing the dashboard do not call AWS or require AWS credentials.
+Open `/` or `/dashboard` on the running Rails server to view seeded multi-service
+inventory and monthly cost trends for the `Course demo` environment. Loading seeds
+and viewing the dashboard do not call AWS or require AWS credentials.
 
-The `Course demo` environment uses fictional `us-east-1` resources. It is separate from the team's live `us-east-2` sandbox and demonstrates that stored inventory is not restricted to the sandbox region. Rerunning seeds refreshes the demo records while preserving their database IDs and unrelated inventory. Keep the demo environment's name, provider, and region stable; changing them can create another demo environment. Manual edits to seeded resource attributes are overwritten on the next seed run.
+The `Course demo` environment uses fictional `us-east-1` resources and cost
+snapshots. It is separate from the team's live `us-east-2` sandbox. Cost Explorer
+follows the selected environment (sibling environments do not share chart data).
+Rerunning seeds refreshes demo records while preserving their database IDs and
+unrelated inventory. Keep the demo environment's name, provider, and region
+stable; changing them can create another demo environment. Manual edits to seeded
+resource attributes are overwritten on the next seed run.
 
 The dashboard reads stored records. Running the adapter or
 `script/verify_resources.rb` alone returns discovery results without saving them;
@@ -474,15 +481,16 @@ access-control boundary.
 
 ## Development Status
 
-The Iteration 2 prototype is a curated AWS inventory dashboard: seeded demo
-browse/search, shared pin/hide/restore, and Heroku deployment for staff
-evaluation without AWS accounts. Read-only EC2/S3 discovery, ScanCoordinator,
-and ResourceSync are implemented and tested; live **Refresh resources** remains
-feature-flagged and is disabled on the Iteration 2 Heroku demo.
+The Iteration 2 prototype is a curated AWS inventory dashboard: category-based
+browse/search, shared pin/hide/restore, Cost Explorer on Overview, and Heroku
+deployment for staff evaluation without AWS accounts. Read-only multi-service
+discovery, ScanCoordinator, and ResourceSync are implemented and tested; live
+**Refresh resources** remains feature-flagged and is disabled on the Iteration 2
+Heroku demo.
 
-Cucumber acceptance scenarios cover the core product workflows, including
-mocked successful and failed scans. Live AWS connectivity is verified separately
-from automated tests.
+Cucumber acceptance scenarios cover the core product workflows, including Cost
+Explorer and mocked successful/failed scans. Live AWS connectivity is verified
+separately from automated tests.
 
 ## Team
 
