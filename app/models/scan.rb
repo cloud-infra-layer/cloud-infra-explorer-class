@@ -1,6 +1,6 @@
 class Scan < ApplicationRecord
   STATUSES = %w[running completed partial failed].freeze
-  RESOURCE_TYPES = %w[ec2 s3].freeze
+  RESOURCE_TYPES = Resource::SERVICES.freeze
   ERROR_FIELDS = %w[resource_type code message].freeze
 
   belongs_to :environment
@@ -19,7 +19,7 @@ class Scan < ApplicationRecord
   def resource_types_are_supported
     unless resource_types.is_a?(Array) && resource_types.any? &&
         resource_types.uniq == resource_types && resource_types.all? { |type| RESOURCE_TYPES.include?(type) }
-      errors.add(:resource_types, "must be a nonempty array of unique ec2 or s3 strings")
+      errors.add(:resource_types, "must be a nonempty array of unique supported inventory service strings")
     end
   end
 

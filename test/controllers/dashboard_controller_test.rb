@@ -1,18 +1,17 @@
-
 require "test_helper"
 
 class DashboardControllerTest < ActionDispatch::IntegrationTest
-  test "homepage and dashboard route render the cards and connected account" do
+  test "homepage and dashboard route render overview categories" do
     [ root_url, dashboard_url ].each do |url|
       get url
 
       assert_response :success
-      assert_select "h1", "Cloud Infrastructure Explorer"
+      assert_select "title", text: /Overview/
       assert_select ".connected-account-card", count: 1
-      assert_category_card "ec2", "EC2 Instances", 1
-      assert_category_card "s3", "S3 Buckets", 1
-      assert_select "section#ec2-resources", count: 0
-      assert_select "section#s3-resources", count: 0
+      assert_category_card "compute", "Compute", 1
+      assert_category_card "storage", "Storage", 1
+      assert_category_card "databases", "Database", 0
+      assert_category_card "ai", "AI / ML", 0
     end
   end
 
@@ -20,8 +19,8 @@ class DashboardControllerTest < ActionDispatch::IntegrationTest
     get dashboard_url
 
     assert_response :success
-    assert_category_card "ec2", "EC2 Instances", 1
-    assert_category_card "s3", "S3 Buckets", 1
+    assert_category_card "compute", "Compute", 1
+    assert_category_card "storage", "Storage", 1
     assert_select ".category-grid table", count: 0
   end
 
@@ -34,30 +33,31 @@ class DashboardControllerTest < ActionDispatch::IntegrationTest
     get dashboard_url
 
     assert_response :success
-    assert_category_card "ec2", "EC2 Instances", 2
-    assert_category_card "s3", "S3 Buckets", 1
+    assert_category_card "compute", "Compute", 2
+    assert_category_card "storage", "Storage", 1
   end
 
-  test "empty S3 category remains visible alongside EC2" do
+  test "empty storage category remains visible alongside compute" do
     Resource.where(service: "s3").delete_all
 
     get dashboard_url
 
     assert_response :success
-    assert_category_card "s3", "S3 Buckets", 0
-    assert_category_card "ec2", "EC2 Instances", 1
-    assert_select ".category-card .category-description", text: "No stored resources yet.", count: 1
+    assert_category_card "storage", "Storage", 0
+    assert_category_card "compute", "Compute", 1
+    assert_select ".category-card .category-insight", text: "No stored resources yet.", count: 3
   end
 
-  test "empty inventory renders both zero-count cards" do
+  test "empty inventory renders zero-count category cards" do
     Resource.delete_all
 
     get root_url
 
     assert_response :success
-    assert_category_card "ec2", "EC2 Instances", 0
-    assert_category_card "s3", "S3 Buckets", 0
-    assert_select ".category-card .category-description", text: "No stored resources yet.", count: 2
+    Resource::CATEGORIES.each_key do |category|
+      assert_category_card category, Resource::CATEGORIES.fetch(category).fetch(:label), 0
+    end
+    assert_select ".category-card .category-insight", text: "No stored resources yet.", count: 4
     assert_select ".category-grid table", count: 0
   end
 
@@ -72,19 +72,13 @@ class DashboardControllerTest < ActionDispatch::IntegrationTest
     assert_select "tbody th", text: resource.name
   end
 
-  # Ian's frontend dashboard tests
-
-  test "dashboard shows linked EC2 and S3 cards with stored counts" do
+  test "dashboard shows linked category cards with stored counts" do
     get root_url
 
     assert_response :success
-    assert_select ".category-card", count: 2
-
-    assert_category_card "ec2", "EC2 Instances",
-      Resource.where(provider: "aws", service: "ec2").count
-
-    assert_category_card "s3", "S3 Buckets",
-      Resource.where(provider: "aws", service: "s3").count
+    assert_select ".category-card", count: 4
+    assert_category_card "compute", "Compute", Resource.where(provider: "aws", service: "ec2").visible.count
+    assert_category_card "storage", "Storage", Resource.where(provider: "aws", service: "s3").visible.count
   end
 
   test "dashboard reflects changes to stored inventory" do
@@ -95,44 +89,19 @@ class DashboardControllerTest < ActionDispatch::IntegrationTest
     get root_url
 
     assert_response :success
-
-    assert_category_card "ec2", "EC2 Instances",
-      Resource.where(provider: "aws", service: "ec2").count
-
-    assert_category_card "s3", "S3 Buckets",
-      Resource.where(provider: "aws", service: "s3").count
+    assert_category_card "compute", "Compute", Resource.where(provider: "aws", service: "ec2").visible.count
+    assert_category_card "storage", "Storage", Resource.where(provider: "aws", service: "s3").visible.count
   end
 
-  test "empty category stays visible and clickable alongside populated category" do
+  test "empty category stays visible alongside populated category" do
     Resource.where(service: "ec2").delete_all
 
     get root_url
 
     assert_response :success
-
-    assert_category_card "ec2", "EC2 Instances", 0
-
-    assert_category_card "s3", "S3 Buckets",
-      Resource.where(provider: "aws", service: "s3").count
-
-    assert_select ".category-card .category-description",
-      text: "No stored resources yet.",
-      count: 1
-  end
-
-  test "empty inventory displays both zero-count cards" do
-    Resource.delete_all
-
-    get root_url
-
-    assert_response :success
-
-    assert_category_card "ec2", "EC2 Instances", 0
-    assert_category_card "s3", "S3 Buckets", 0
-
-    assert_select ".category-card .category-description",
-      text: "No stored resources yet.",
-      count: 2
+    assert_category_card "compute", "Compute", 0
+    assert_category_card "storage", "Storage", Resource.where(provider: "aws", service: "s3").count
+    assert_select ".category-card .category-insight", text: "No stored resources yet.", count: 3
   end
 
   test "dashboard renders without AWS credentials" do
@@ -152,59 +121,88 @@ class DashboardControllerTest < ActionDispatch::IntegrationTest
     get root_url
 
     assert_response :success
-    assert_select ".category-card", count: 2
+    assert_select ".category-card", count: 4
   ensure
     original_values&.each do |key, value|
       ENV[key] = value
     end
   end
 
-  test "dashboard displays accurate infrastructure statistics" do
-  ec2 = resources(:web_server)
-  s3 = resources(:assets_bucket)
-
-  Resource.where.not(id: [ ec2.id, s3.id ]).delete_all
-
-  ec2.update!(pinned: true, hidden: false)
-  s3.update!(pinned: false, hidden: false)
-
-  get dashboard_url
-
-  assert_response :success
-  assert_select ".dashboard-stats .stat-card", count: 4
-
-    assert_select ".stat-card:nth-child(1)" do
-      assert_select ".stat-label", "Active Services"
-      assert_select ".stat-value span", "2"
-      assert_select ".stat-value small", "/240+"
+  test "dashboard shows cost insights when monthly snapshots exist" do
+    environment = environments(:course_development)
+    CostSnapshot.delete_all
+    [
+      [ Date.new(2026, 10, 1), Date.new(2026, 10, 31), "Amazon Elastic Compute Cloud - Compute", "20.00" ],
+      [ Date.new(2026, 10, 1), Date.new(2026, 10, 31), "Amazon Bedrock", "40.00" ],
+      [ Date.new(2026, 11, 1), Date.new(2026, 11, 30), "Amazon Elastic Compute Cloud - Compute", "25.00" ],
+      [ Date.new(2026, 11, 1), Date.new(2026, 11, 30), "Amazon Bedrock", "50.00" ]
+    ].each do |period_start, period_end, service_code, amount|
+      environment.cost_snapshots.create!(
+        period_start: period_start,
+        period_end: period_end,
+        granularity: "MONTHLY",
+        service_code: service_code,
+        amount: amount,
+        currency: "USD"
+      )
     end
 
-    assert_select ".stat-card:nth-child(2)" do
-      assert_select ".stat-label", "Total Resources"
-      assert_select ".stat-value span", "2"
-    end
+    get dashboard_url
 
-    assert_select ".stat-card:nth-child(3)" do
-      assert_select ".stat-label", "Pinned"
-      assert_select ".stat-value span", "1"
-      assert_select ".stat-value small", "/2"
-    end
+    assert_response :success
+    assert_select ".cost-insights-period", "November 2026"
+    assert_select ".dashboard-stats .stat-card", count: 3
+    assert_select ".stat-card:nth-child(1) .stat-label", "Monthly spend"
+    assert_select ".stat-card:nth-child(1) .stat-value span", "$75.00"
+    assert_select ".stat-card:nth-child(1) .stat-delta", text: /MoM/
+    assert_select ".stat-card:nth-child(1) .stat-trend--up", "+25.0%"
+    assert_select ".stat-card:nth-child(2) .stat-value span", "AWS Bedrock"
+    assert_select ".cost-chart-point", count: 4
+    assert_select ".cost-chart-range.is-active", "6M"
+    assert_select ".cost-chart-legend", text: /AWS Bedrock/
+  end
 
-    assert_select ".stat-card:nth-child(4)" do
-      assert_select ".stat-label", "Needs Attention"
-      assert_select ".stat-value span", "—"
-      assert_select ".stat-value small", "/2"
-    end
+  test "cost explorer uses the selected environment and ignores sibling environment spend" do
+    CostSnapshot.delete_all
+    selected = environments(:course_development)
+    other = environments(:course_testing)
+
+    selected.cost_snapshots.create!(
+      period_start: Date.new(2026, 11, 1),
+      period_end: Date.new(2026, 11, 30),
+      granularity: "MONTHLY",
+      service_code: "Amazon Bedrock",
+      amount: "50.00",
+      currency: "USD"
+    )
+    other.cost_snapshots.create!(
+      period_start: Date.new(2026, 11, 1),
+      period_end: Date.new(2026, 11, 30),
+      granularity: "MONTHLY",
+      service_code: "Amazon Bedrock",
+      amount: "999.00",
+      currency: "USD"
+    )
+
+    get dashboard_url, params: { environment_id: selected.id }
+
+    assert_response :success
+    assert_select ".stat-card:nth-child(1) .stat-value span", "$50.00"
+    assert_select ".stat-card:nth-child(1) .stat-value span", text: "$1049.00", count: 0
+
+    get dashboard_url, params: { environment_id: other.id }
+
+    assert_response :success
+    assert_select ".stat-card:nth-child(1) .stat-value span", "$999.00"
   end
 
   private
 
-  def assert_category_card(service, name, count)
+  def assert_category_card(category, name, count)
     assert_select "a.category-card[href=?]",
-      resources_path(service: service),
+      resources_path(category: category),
       count: 1 do
       assert_select "h2", name
-
       assert_select ".resource-count",
         "#{count} #{count == 1 ? 'resource' : 'resources'}"
     end

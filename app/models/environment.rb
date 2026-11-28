@@ -1,6 +1,7 @@
 class Environment < ApplicationRecord
   has_many :resources, dependent: :restrict_with_error
   has_many :scans, dependent: :restrict_with_error
+  has_many :cost_snapshots, dependent: :restrict_with_error
 
   validates :name, :provider, :region, presence: true
   validates :provider, inclusion: { in: %w[aws] }

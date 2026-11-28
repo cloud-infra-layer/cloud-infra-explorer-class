@@ -1,4 +1,5 @@
 require "minitest/autorun"
+require "aws-sdk-cloudwatch"
 require_relative "../../../app/services/cloud_provider/adapter"
 
 class S3AdapterTest < Minitest::Test
@@ -6,9 +7,11 @@ class S3AdapterTest < Minitest::Test
     @region = "eu-west-1"
     @s3 = Aws::S3::Client.new(region: @region, stub_responses: true)
     @ec2 = Aws::EC2::Client.new(region: @region, stub_responses: true)
+    @cloudwatch = Aws::CloudWatch::Client.new(region: @region, stub_responses: true)
     @adapter = CloudProvider::Adapter.new(
       s3_client_factory: ->(region) { assert_equal @region, region; @s3 },
-      ec2_client_factory: ->(region) { assert_equal @region, region; @ec2 })
+      ec2_client_factory: ->(region) { assert_equal @region, region; @ec2 },
+      cloudwatch_client_factory: ->(region) { assert_equal @region, region; @cloudwatch })
     @context = { provider: "aws", region: @region, resource_types: [ "s3" ] }
   end
 
@@ -21,7 +24,8 @@ class S3AdapterTest < Minitest::Test
     assert_empty result[:errors]
     assert_equal %w[example-bucket another-bucket], result[:resources].map { |r| r[:resource_id] }
     assert_equal({ provider: "aws", resource_id: "example-bucket", service: "s3",
-      name: "example-bucket", region: @region, metadata: {},
+      name: "example-bucket", region: @region,
+      metadata: { creation_date: "2020-01-01T00:00:00Z", size_bytes: nil, object_count: nil },
       console_url: "https://s3.console.aws.amazon.com/s3/buckets/example-bucket?region=eu-west-1&tab=objects" }, result[:resources].first)
     assert_equal NORMALIZED_FIELDS, result[:resources].first.keys
     refute_includes result[:resources].first.keys, :pinned
@@ -40,7 +44,7 @@ class S3AdapterTest < Minitest::Test
     assert_empty first[:errors]
     assert_equal first, second
     assert_equal "example-bucket", first[:resources].first[:resource_id]
-    assert_equal({}, first[:resources].first[:metadata])
+    assert_equal({ creation_date: "2020-01-01T00:00:00Z", size_bytes: nil, object_count: nil }, first[:resources].first[:metadata])
   end
 
   def test_valid_empty_inventory_and_duplicate_string_types

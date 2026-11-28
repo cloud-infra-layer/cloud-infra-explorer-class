@@ -34,7 +34,7 @@ RSpec.describe ScanCoordinator do
       result
     end
     scan = nil
-    expect { scan = coordinator.call }.to change { environment.scans.count }.by(1)
+    expect { scan = coordinator.call(resource_types: %w[ec2 s3]) }.to change { environment.scans.count }.by(1)
       .and change { environment.resources.count }.by(2)
 
     expect(scan.reload).to have_attributes(status: "completed", resource_types: %w[ec2 s3],
@@ -47,7 +47,7 @@ RSpec.describe ScanCoordinator do
     personalized_inventory
     original = snapshot
     allow(adapter).to receive(:list_resources).and_return(resources: [], errors: [])
-    scan = coordinator.call.reload
+    scan = coordinator.call(resource_types: %w[ec2 s3]).reload
     expect(scan).to have_attributes(status: "completed", discovered_count: 0, created_count: 0, updated_count: 0)
     expect(snapshot).to eq(original)
   end
@@ -58,12 +58,12 @@ RSpec.describe ScanCoordinator do
     changed = [ ec2.merge(name: "Updated server", metadata: { state: "stopped" }), s3.merge(name: "Updated bucket") ]
     allow(adapter).to receive(:list_resources).and_return(resources: changed, errors: [])
 
-    expect(coordinator.call.reload).to have_attributes(status: "completed", created_count: 0, updated_count: 2)
+    expect(coordinator.call(resource_types: %w[ec2 s3]).reload).to have_attributes(status: "completed", created_count: 0, updated_count: 2)
     expect(environment.resources.order(:id).pluck(:id)).to eq(ids)
     expect(resources.map { |resource| resource.reload.name }).to eq([ "Updated server", "Updated bucket" ])
     expect(resources.map { |resource| [ resource.pinned, resource.hidden ] }).to eq([ [ true, true ], [ true, true ] ])
     original = snapshot
-    expect(coordinator.call.reload).to have_attributes(status: "completed", created_count: 0, updated_count: 0)
+    expect(coordinator.call(resource_types: %w[ec2 s3]).reload).to have_attributes(status: "completed", created_count: 0, updated_count: 0)
     expect(snapshot).to eq(original)
   end
 
@@ -77,7 +77,7 @@ RSpec.describe ScanCoordinator do
       allow(adapter).to receive(:list_resources).and_return(
         resources: [ ec2.merge(name: "Updated ec2"), s3.merge(name: "Updated s3") ], errors: [ error ])
 
-      scan = coordinator.call.reload
+      scan = coordinator.call(resource_types: %w[ec2 s3]).reload
       expect(scan).to have_attributes(status: "partial", discovered_count: 1, created_count: 0, updated_count: 1,
         error_details: [ error.stringify_keys ])
       expect(failed.reload.attributes).to eq(original)
@@ -89,7 +89,7 @@ RSpec.describe ScanCoordinator do
   it "inserts successful discoveries in a partial scan and ignores failed-service payloads" do
     previous = environment.resources.create!(ec2.merge(resource_id: "i-previous"))
     allow(adapter).to receive(:list_resources).and_return(resources: [ ec2, s3 ], errors: [ error_for("ec2") ])
-    expect(coordinator.call.reload).to have_attributes(status: "partial", discovered_count: 1, created_count: 1, updated_count: 0)
+    expect(coordinator.call(resource_types: %w[ec2 s3]).reload).to have_attributes(status: "partial", discovered_count: 1, created_count: 1, updated_count: 0)
     expect(previous.reload).to be_persisted
     expect(environment.resources.exists?(resource_id: ec2[:resource_id])).to be(false)
     expect(environment.resources.exists?(resource_id: s3[:resource_id])).to be(true)
@@ -99,9 +99,9 @@ RSpec.describe ScanCoordinator do
     personalized_inventory
     original = snapshot
     allow(adapter).to receive(:list_resources).and_return(resources: [], errors: [ error_for("ec2") ])
-    expect(coordinator.call.reload).to have_attributes(status: "partial", discovered_count: 0, created_count: 0, updated_count: 0)
+    expect(coordinator.call(resource_types: %w[ec2 s3]).reload).to have_attributes(status: "partial", discovered_count: 0, created_count: 0, updated_count: 0)
     allow(adapter).to receive(:list_resources).and_return(resources: [], errors: [ error_for("ec2"), error_for("s3") ])
-    expect(coordinator.call.reload).to have_attributes(status: "failed", discovered_count: 0, created_count: 0, updated_count: 0)
+    expect(coordinator.call(resource_types: %w[ec2 s3]).reload).to have_attributes(status: "failed", discovered_count: 0, created_count: 0, updated_count: 0)
     expect(snapshot).to eq(original)
   end
 
@@ -109,7 +109,7 @@ RSpec.describe ScanCoordinator do
     personalized_inventory
     original = snapshot
     allow(adapter).to receive(:list_resources).and_return(resources: [ ec2.merge(name: "Must not save") ], errors: [ error_for("connection") ])
-    expect(coordinator.call.reload).to have_attributes(status: "failed", discovered_count: 0, updated_count: 0)
+    expect(coordinator.call(resource_types: %w[ec2 s3]).reload).to have_attributes(status: "failed", discovered_count: 0, updated_count: 0)
     expect(snapshot).to eq(original)
   end
 
@@ -132,7 +132,7 @@ RSpec.describe ScanCoordinator do
     personalized_inventory
     original = snapshot
     allow(adapter).to receive(:list_resources).and_return(resources: [ ec2.merge(name: "Must not save"), s3.merge(pinned: false) ], errors: [])
-    scan = coordinator.call.reload
+    scan = coordinator.call(resource_types: %w[ec2 s3]).reload
     expect(scan).to have_attributes(status: "failed", created_count: 0, updated_count: 0)
     expect(scan.error_details.first).to include("resource_type" => "persistence", "code" => "invalid_resource")
     expect(snapshot).to eq(original)
@@ -140,7 +140,7 @@ RSpec.describe ScanCoordinator do
 
   it "sanitizes unexpected discovery exceptions" do
     allow(adapter).to receive(:list_resources).and_raise(StandardError, "private-sdk-value")
-    scan = coordinator.call.reload
+    scan = coordinator.call(resource_types: %w[ec2 s3]).reload
     expect(scan).to have_attributes(status: "failed", created_count: 0, updated_count: 0)
     expect(scan.error_details.first).to include("code" => "discovery_failed")
     expect(scan.error_details.to_s).not_to include("private-sdk-value")
@@ -152,7 +152,7 @@ RSpec.describe ScanCoordinator do
     { resources: [ { service: "lambda" } ], errors: [] } ].each do |malformed|
     it "records safe failure for malformed adapter result #{malformed.inspect}" do
       allow(adapter).to receive(:list_resources).and_return(malformed)
-      scan = coordinator.call.reload
+      scan = coordinator.call(resource_types: %w[ec2 s3]).reload
       expect(scan.status).to eq("failed")
       expect(scan.error_details.first).to include("code" => "discovery_failed")
       expect(environment.resources).to be_empty

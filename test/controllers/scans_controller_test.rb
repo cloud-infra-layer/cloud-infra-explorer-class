@@ -23,14 +23,14 @@ class ScansControllerTest < ActionDispatch::IntegrationTest
     enable_scans
     post environment_scans_path(@environment), params: { resource_types: [ "lambda" ] }
     assert_redirected_to dashboard_path(environment_id: @environment.id)
-    assert_equal "Select valid EC2/S3 resource types.", flash[:alert]
+    assert_equal "Select valid inventory resource types.", flash[:alert]
   end
 
   test "enabled request invokes coordinator and redirects" do
     enable_scans
     fake = Object.new
     fake.define_singleton_method(:call) do |resource_types:|
-      raise "Unexpected resource types" unless resource_types == %w[ec2 s3]
+      raise "Unexpected resource types" unless resource_types == Resource::SERVICES
       Struct.new(:status, :created_count, :updated_count).new("completed", 2, 1)
     end
 
@@ -131,9 +131,9 @@ class ScansControllerTest < ActionDispatch::IntegrationTest
 
     get dashboard_path
 
-    assert_select ".connected-account-card .empty-state", "No AWS environments are configured."
+    assert_select ".connected-account-card .empty-state", "No environments are configured."
     assert_select "form[action*='/scans']", count: 0
-    assert_select ".category-grid .category-card", count: 2
+    assert_select ".category-grid .category-card", count: 4
   end
 
   test "persisted error messages are escaped" do

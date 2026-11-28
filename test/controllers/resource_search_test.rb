@@ -12,7 +12,7 @@ class ResourceSearchTest < ActionDispatch::IntegrationTest
 
     get resources_path, params: { q: "s3", service: "ec2" }
     assert_response :success
-    assert_select ".empty-state", "No resources match your search in the selected category."
+    assert_select ".empty-state", "No resources match the current filters."
     assert_select "table", count: 0
   end
 

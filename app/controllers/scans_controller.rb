@@ -9,7 +9,7 @@ class ScansController < ApplicationController
 
     unless types.is_a?(Array) && types.any? && types.uniq == types &&
         types.all? { |type| Scan::RESOURCE_TYPES.include?(type) }
-      return redirect_to dashboard_path(environment_id: environment.id), alert: "Select valid EC2/S3 resource types."
+      return redirect_to dashboard_path(environment_id: environment.id), alert: "Select valid inventory resource types."
     end
 
     scan = ScanCoordinator.new(environment: environment).call(resource_types: types)

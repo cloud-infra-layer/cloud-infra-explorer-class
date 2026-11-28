@@ -1,5 +1,5 @@
 class ScanCoordinator
-  RESOURCE_TYPES = %w[ec2 s3].freeze
+  RESOURCE_TYPES = Resource::SERVICES.freeze
   SAFE_FAILURE = {
     "resource_type" => "connection",
     "code" => "discovery_failed",
@@ -12,7 +12,7 @@ class ScanCoordinator
     @sync_factory = sync_factory
   end
 
-  def call(resource_types: [ "ec2", "s3" ])
+  def call(resource_types: Resource::SERVICES.dup)
     unless @environment.is_a?(Environment) && @environment.persisted?
       raise ArgumentError, "A persisted environment is required."
     end

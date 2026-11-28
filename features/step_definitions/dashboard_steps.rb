@@ -36,7 +36,9 @@ Given('the application contains an S3 bucket named {string}') do |name|
     name: name,
     region: "us-east-1",
     metadata: {
-      purpose: "Static assets"
+      creation_date: "2026-01-01T00:00:00Z",
+      size_bytes: "1024",
+      object_count: "3"
     }
   )
 end
@@ -46,19 +48,33 @@ When('I visit the dashboard') do
 end
 
 Then('I should see the cloud infrastructure dashboard') do
-  expect(page).to have_css("h1", text: "Cloud Infrastructure Explorer")
+  expect(page).to have_css("a.category-card", text: "Compute")
+  expect(page).to have_title(/Overview/)
 end
 
 Then('I should see the EC2 and S3 resource categories') do
-  expect(page).to have_css("a.category-card[href='#{resources_path(service: 'ec2')}']", text: "EC2 Instances")
-  expect(page).to have_css("a.category-card[href='#{resources_path(service: 's3')}']", text: "S3 Buckets")
+  expect(page).to have_css("a.category-card[href='#{resources_path(category: 'compute')}']", text: "Compute")
+  expect(page).to have_css("a.category-card[href='#{resources_path(category: 'storage')}']", text: "Storage")
+  expect(page).to have_css("a.category-card[href='#{resources_path(category: 'databases')}']", text: "Database")
+  expect(page).to have_css("a.category-card[href='#{resources_path(category: 'ai')}']", text: "AI / ML")
 end
 
 Then('I should see one resource in each category') do
-  [ "ec2", "s3" ].each do |service|
-    within("a.category-card[href='#{resources_path(service: service)}']") do
-      expect(page).to have_css(".resource-count", text: "1 resource")
-    end
+  within("a.category-card[href='#{resources_path(category: 'compute')}']") do
+    expect(page).to have_css(".resource-count", text: "1 resource")
+  end
+  within("a.category-card[href='#{resources_path(category: 'storage')}']") do
+    expect(page).to have_css(".resource-count", text: "1 resource")
+  end
+end
+
+Then("I should see category insights on the overview cards") do
+  within("a.category-card[href='#{resources_path(category: 'compute')}']") do
+    expect(page).to have_css(".category-icon")
+    expect(page).to have_css(".category-insight", text: /running/)
+  end
+  within("a.category-card[href='#{resources_path(category: 'storage')}']") do
+    expect(page).to have_css(".category-insight", text: /bucket/)
   end
 end
 
@@ -67,11 +83,11 @@ Then('I should see {string}') do |text|
 end
 
 When('I click the EC2 category') do
-  find('a.category-card[href="/resources?service=ec2"]').click
+  find('a.category-card[href="/resources?category=compute"]').click
 end
 
 When('I click the S3 category') do
-  find('a.category-card[href="/resources?service=s3"]').click
+  find('a.category-card[href="/resources?category=storage"]').click
 end
 
 When('I click {string}') do |label|

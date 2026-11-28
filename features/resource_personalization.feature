@@ -13,31 +13,24 @@ Feature: Prioritize important cloud resources
     When I visit the resource inventory
     And I pin the resource "web-server"
     Then I should see "Resource pinned for the team."
-    When I click "Pinned resources"
-    Then I should see "web-server"
+    And I should see a pinned row for "web-server"
 
   Scenario: Unpin a resource
     When I visit the resource inventory
     And I pin the resource "web-server"
     And I unpin the resource "web-server"
     Then I should see "Resource unpinned for the team."
-    When I click "Pinned resources"
-    Then I should see "No pinned resources"
+    And I should not see a pinned row for "web-server"
 
   Scenario: Hide an irrelevant resource
     When I visit the resource inventory
     And I hide the resource "web-server"
     Then I should see "Resource hidden from the team's visible inventory."
-    And I should not see "web-server"
-    When I click "Hidden resources"
-    Then I should see "web-server"
+    And I should see a hidden row for "web-server"
 
   Scenario: Restore a hidden resource
     When I visit the resource inventory
     And I hide the resource "web-server"
-    And I click "Hidden resources"
     And I restore the resource "web-server"
     Then I should see "Resource restored to the team's visible inventory."
-    And I should not see "web-server"
-    When I click "All visible resources"
-    Then I should see "web-server"
+    And I should not see a hidden row for "web-server"

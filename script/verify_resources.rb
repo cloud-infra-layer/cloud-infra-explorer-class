@@ -5,13 +5,14 @@ require "json"
 require "optparse"
 require_relative "../app/services/cloud_provider/adapter"
 
-services = [ "ec2", "s3" ]
+SUPPORTED = %w[ec2 s3 rds bedrock].freeze
+services = SUPPORTED.dup
 parser = OptionParser.new do |options|
-  options.banner = "Usage: ruby script/verify_resources.rb [--services ec2,s3]"
-  options.on("--services SERVICES", "Comma-separated services: ec2,s3 (default: both)") do |value|
+  options.banner = "Usage: ruby script/verify_resources.rb [--services ec2,s3,rds,bedrock]"
+  options.on("--services SERVICES", "Comma-separated services: #{SUPPORTED.join(',')} (default: all)") do |value|
     services = value.split(",", -1).map(&:strip).uniq
-    unless services.any? && services.all? { |service| [ "ec2", "s3" ].include?(service) }
-      raise OptionParser::InvalidArgument, "--services must contain only ec2 or s3"
+    unless services.any? && services.all? { |service| SUPPORTED.include?(service) }
+      raise OptionParser::InvalidArgument, "--services must contain only #{SUPPORTED.join(', ')}"
     end
   end
   options.on("-h", "--help", "Show usage") do

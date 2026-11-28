@@ -66,7 +66,7 @@ RSpec.describe "Resource personalization writes", type: :request do
     patch hide_resource_path(resource), params: {
       q: "  server ", service: "ec2", pinned: "1", return_to: "https://example.com"
     }
-    expect(response).to redirect_to(resources_path(q: "server", service: "ec2", pinned: "1"))
+    expect(response).to redirect_to(resources_path(q: "server", service: "ec2"))
     expect(resource.reload).to be_hidden
 
     patch restore_resource_path(resource), params: {

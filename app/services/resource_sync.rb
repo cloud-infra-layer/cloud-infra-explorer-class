@@ -10,7 +10,12 @@ class ResourceSync
 
   FIELDS = %w[provider resource_id service name region metadata console_url].freeze
   REQUIRED_STRINGS = %w[provider resource_id service name].freeze
-  METADATA_FIELDS = { "ec2" => %w[instance_type state], "s3" => [] }.freeze
+  METADATA_FIELDS = {
+    "ec2" => %w[instance_type state cpu_utilization_pct estimated_monthly_cost_usd],
+    "s3" => %w[creation_date size_bytes object_count],
+    "rds" => %w[engine engine_version instance_class status multi_az storage_gb estimated_monthly_cost_usd],
+    "bedrock" => %w[provider_name lifecycle_status input_modalities estimated_monthly_cost_usd]
+  }.freeze
 
   def initialize(environment:)
     @environment = environment
@@ -97,7 +102,7 @@ class ResourceSync
 
   def identity_for(attributes)
     fields = %w[provider service resource_id]
-    fields << "region" if attributes.fetch("service") == "ec2"
+    fields << "region" if Resource::REGION_SCOPED_SERVICES.include?(attributes.fetch("service"))
     attributes.slice(*fields)
   end
 

@@ -17,9 +17,13 @@ gem "stimulus-rails"
 # Build JSON APIs with ease [https://github.com/rails/jbuilder]
 gem "jbuilder"
 
-# Read-only EC2 and S3 discovery through the cloud provider adapter.
+# Read-only AWS discovery (EC2, S3, RDS, Bedrock, CloudWatch, Cost Explorer).
 gem "aws-sdk-ec2", "~> 1"
 gem "aws-sdk-s3", "~> 1"
+gem "aws-sdk-rds", "~> 1"
+gem "aws-sdk-cloudwatch", "~> 1"
+gem "aws-sdk-bedrock", "~> 1"
+gem "aws-sdk-costexplorer", "~> 1"
 
 # Use Active Model has_secure_password [https://guides.rubyonrails.org/active_model_basics.html#securepassword]
 # gem "bcrypt", "~> 3.1.7"

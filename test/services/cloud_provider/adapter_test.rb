@@ -1,14 +1,21 @@
 require "minitest/autorun"
+require "aws-sdk-cloudwatch"
 require_relative "../../../app/services/cloud_provider/adapter"
 
 # These unit tests deliberately do not boot Rails or connect to PostgreSQL.
 class CloudProviderAdapterTest < Minitest::Test
   def setup
     @client = Aws::EC2::Client.new(region: "us-east-2", stub_responses: true)
-    @adapter = CloudProvider::Adapter.new(ec2_client_factory: ->(region) {
-      assert_equal "us-east-2", region
-      @client
-    })
+    @cloudwatch = Aws::CloudWatch::Client.new(region: "us-east-2", stub_responses: true)
+    @adapter = CloudProvider::Adapter.new(
+      ec2_client_factory: ->(region) {
+        assert_equal "us-east-2", region
+        @client
+      },
+      cloudwatch_client_factory: ->(region) {
+        assert_equal "us-east-2", region
+        @cloudwatch
+      })
     @context = { provider: "aws", region: "us-east-2", resource_types: [ "ec2" ] }
   end
 
@@ -20,7 +27,7 @@ class CloudProviderAdapterTest < Minitest::Test
     assert_equal [ {
       provider: "aws", resource_id: "i-0123456789abcdef0", service: "ec2",
       name: "course-server", region: "us-east-2",
-      metadata: { instance_type: "t3.micro", state: "running" },
+      metadata: { instance_type: "t3.micro", state: "running", cpu_utilization_pct: nil, estimated_monthly_cost_usd: "7.50" },
       console_url: "https://us-east-2.console.aws.amazon.com/ec2/home?region=us-east-2#InstanceDetails:instanceId=i-0123456789abcdef0"
     } ], result[:resources]
     refute_includes result.to_s, "private-tag-value"
@@ -37,7 +44,7 @@ class CloudProviderAdapterTest < Minitest::Test
     assert_empty first[:errors]
     assert_equal first, second
     assert_equal "i-0123456789abcdef0", first[:resources].first[:resource_id]
-    assert_equal({ instance_type: "t3.micro", state: "running" }, first[:resources].first[:metadata])
+    assert_equal({ instance_type: "t3.micro", state: "running", cpu_utilization_pct: nil, estimated_monthly_cost_usd: "7.50" }, first[:resources].first[:metadata])
   end
 
   def test_scans_each_requested_region_with_the_same_adapter
@@ -49,7 +56,10 @@ class CloudProviderAdapterTest < Minitest::Test
       ] } ])
       [ region, client ]
     end
-    adapter = CloudProvider::Adapter.new(ec2_client_factory: ->(region) { clients.fetch(region) })
+    cw = Aws::CloudWatch::Client.new(region: "us-east-1", stub_responses: true)
+    adapter = CloudProvider::Adapter.new(
+      ec2_client_factory: ->(region) { clients.fetch(region) },
+      cloudwatch_client_factory: ->(_region) { cw })
 
     clients.each do |region, client|
       result = adapter.list_resources(@context.merge(region: region))
@@ -58,7 +68,7 @@ class CloudProviderAdapterTest < Minitest::Test
       assert_equal region, resource[:region]
       assert_equal "i-another", resource[:resource_id]
       assert_equal "another-workload", resource[:name]
-      assert_equal({ instance_type: "m7i.large", state: "stopped" }, resource[:metadata])
+      assert_equal({ instance_type: "m7i.large", state: "stopped", cpu_utilization_pct: nil, estimated_monthly_cost_usd: nil }, resource[:metadata])
       assert_equal "https://#{region}.console.aws.amazon.com/ec2/home?region=#{region}#InstanceDetails:instanceId=i-another", resource[:console_url]
       assert_equal({ max_results: 1000 }, client.api_requests.fetch(0)[:params])
     end
@@ -67,10 +77,13 @@ class CloudProviderAdapterTest < Minitest::Test
   def test_other_partitions_do_not_receive_commercial_console_links
     client = Aws::EC2::Client.new(region: "cn-north-1", stub_responses: true)
     client.stub_responses(:describe_instances, reservations: [ { instances: [ instance ] } ])
-    adapter = CloudProvider::Adapter.new(ec2_client_factory: ->(region) {
-      assert_equal "cn-north-1", region
-      client
-    })
+    cw = Aws::CloudWatch::Client.new(region: "cn-north-1", stub_responses: true)
+    adapter = CloudProvider::Adapter.new(
+      ec2_client_factory: ->(region) {
+        assert_equal "cn-north-1", region
+        client
+      },
+      cloudwatch_client_factory: ->(_region) { cw })
     result = adapter.list_resources(@context.merge(region: "cn-north-1"))
     assert_empty result[:errors]
     assert_equal "cn-north-1", result[:resources].first[:region]

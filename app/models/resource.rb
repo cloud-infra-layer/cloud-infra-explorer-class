@@ -1,4 +1,32 @@
 class Resource < ApplicationRecord
+  SERVICES = %w[ec2 s3 rds bedrock].freeze
+  REGION_SCOPED_SERVICES = %w[ec2 rds bedrock].freeze
+
+  # Generic product categories map 1..n cloud services. Add services here instead of
+  # hardcoding new top-nav links or dashboard cards.
+  CATEGORIES = {
+    "compute" => {
+      label: "Compute",
+      description: "Virtual machines and instance capacity.",
+      services: %w[ec2]
+    },
+    "storage" => {
+      label: "Storage",
+      description: "Object storage buckets and data assets.",
+      services: %w[s3]
+    },
+    "databases" => {
+      label: "Database",
+      description: "Managed database instances and clusters.",
+      services: %w[rds]
+    },
+    "ai" => {
+      label: "AI / ML",
+      description: "Foundation models and generative AI services.",
+      services: %w[bedrock]
+    }
+  }.freeze
+
   belongs_to :environment
 
   scope :visible, -> { where(hidden: false) }
@@ -13,14 +41,25 @@ class Resource < ApplicationRecord
     where("resources.name ILIKE :pattern OR resources.service ILIKE :pattern OR resources.resource_id ILIKE :pattern", pattern: pattern)
   end
 
+  def self.services_for_category(category)
+    CATEGORIES.dig(category.to_s, :services)
+  end
+
+  def self.category_for_service(service)
+    CATEGORIES.each do |key, config|
+      return key if config.fetch(:services).include?(service.to_s)
+    end
+    nil
+  end
+
   validates :pinned, :hidden, inclusion: { in: [ true, false ] }
 
   validates :provider, :resource_id, :service, :name, presence: true
   validates :provider, inclusion: { in: %w[aws] }
-  validates :service, inclusion: { in: %w[ec2 s3] }
+  validates :service, inclusion: { in: SERVICES }
   validates :resource_id,
     uniqueness: { scope: %i[environment_id provider service region] },
-    if: -> { service == "ec2" }
+    if: -> { REGION_SCOPED_SERVICES.include?(service) }
   validates :resource_id,
     uniqueness: { scope: %i[environment_id provider service] },
     if: -> { service == "s3" }

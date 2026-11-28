@@ -1,26 +1,32 @@
 require "test_helper"
 
 class ResourceVisibilityTest < ActionDispatch::IntegrationTest
-  test "listing defaults to visible resources and allows searching hidden inventory" do
+  test "listing includes hidden rows and supports category narrowing" do
     bucket = resources(:assets_bucket)
     bucket.update!(hidden: true)
 
     get resources_path
     assert_response :success
-    assert_select "tbody th", text: bucket.name, count: 0
+    assert_select "tbody th", text: bucket.name, count: 1
+    assert_select "tr.resource-row--hidden th", text: bucket.name
 
-    get resources_path, params: { visibility: "hidden", service: "s3", q: bucket.name.upcase }
+    get resources_path, params: { category: "storage" }
+    assert_response :success
+    assert_select "tbody th", text: bucket.name, count: 1
+    assert_select "tbody th", text: resources(:web_server).name, count: 0
+
+    get resources_path, params: { categories: %w[compute storage], q: bucket.name.upcase }
     assert_response :success
     assert_select "tbody tr", count: 1
     assert_select "tbody th", text: bucket.name
-    assert bucket.reload.hidden?
   end
 
-  test "structured or unsupported visibility returns bad request" do
-    [ "all", [ "hidden" ], { value: "hidden" } ].each do |visibility|
-      get resources_path, params: { visibility: visibility }
-      assert_response :bad_request
-    end
+  test "unsupported category returns not found" do
+    get resources_path, params: { category: "lambda" }
+    assert_response :not_found
+
+    get resources_path, params: { categories: %w[compute lambda] }
+    assert_response :not_found
   end
 
   test "listing orders pins first and dashboard counts exclude hidden inventory" do
@@ -37,14 +43,11 @@ class ResourceVisibilityTest < ActionDispatch::IntegrationTest
     web.update!(hidden: true)
     get dashboard_path
     assert_response :success
-    assert_select "a.category-card[href=?]", resources_path(service: "ec2") do
+    assert_select "a.category-card[href=?]", resources_path(category: "compute") do
       assert_select ".resource-count", text: "0 resources"
     end
-    assert_select "a.category-card[href=?]", resources_path(service: "s3") do
+    assert_select "a.category-card[href=?]", resources_path(category: "storage") do
       assert_select ".resource-count", text: "1 resource"
     end
-    assert_select ".category-card .resource-count", text: "0 resources", count: 1
-    assert_select ".category-card .resource-count", text: "1 resource", count: 1
-    assert web.reload.hidden?
   end
 end

@@ -21,8 +21,9 @@ RSpec.describe "Inventory HTTP responses", type: :request do
       expect(response).to have_http_status(:ok)
       expect(response.media_type).to eq("text/html")
       document = Nokogiri::HTML(response.body)
-      expect(document.at_css("h1").text).to eq("Cloud Infrastructure Explorer")
-      expect(document.css("main .category-card .category-description").map { |node| node.text.strip }).to eq([ "No stored resources yet.", "No stored resources yet." ])
+      expect(document.at_css("title").text).to include("Overview")
+      expect(document.css("main h1")).to be_empty
+      expect(document.css("main .category-card .category-insight").map { |node| node.text.strip }).to eq([ "No stored resources yet." ] * 4)
       expect(document.css("main table")).to be_empty
     end
   end
@@ -45,9 +46,11 @@ RSpec.describe "Inventory HTTP responses", type: :request do
 
       expect(response).to have_http_status(:ok)
       document = Nokogiri::HTML(response.body)
-      expect(document.at_css("h1").text).to eq("Resources")
+      expect(document.css("main h1")).to be_empty
       expect(document.css("tbody tr").size).to eq(2)
       expect(document.css("tbody th").map(&:text)).to contain_exactly("Request web server", "Request assets")
+      expect(document.css("thead th").map(&:text)).to include("Provider")
+      expect(document.css("thead th").map(&:text)).not_to include("Status")
     end
   end
 
@@ -82,7 +85,12 @@ RSpec.describe "Inventory HTTP responses", type: :request do
     document = Nokogiri::HTML(response.body)
     expect(document.css("tbody script")).to be_empty
     expect(document.at_css("tbody th").text).to eq(html)
-    expect(document.css("tbody td").map(&:text)).to eq([ "EC2", html, html, "State: #{html}", "Unpinned" ])
+    cells = document.css("tbody td").map { |node| node.text.gsub(/\s+/, " ").strip }
+    expect(cells[0, 4]).to eq([ "Compute", "AWS", "EC2", html ])
+    expect(document.css(".resource-details-list dd").map(&:text)).to include(html)
+    expect(document.css("thead th").map(&:text)).to include("Metadata")
+    expect(document.css("thead th").map(&:text)).not_to include("ID")
+    expect(document.css("thead th").map(&:text)).not_to include("Details")
     expect(response.body).to include("&lt;script&gt;")
   end
 end

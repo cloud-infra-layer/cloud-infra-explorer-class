@@ -22,7 +22,7 @@ class ScanCoordinatorTest < ActiveSupport::TestCase
     adapter = FakeAdapter.new(resources: [ ec2_record, s3_record ], errors: [])
 
     assert_difference -> { @environment.resources.count } => 2, -> { Scan.count } => 1 do
-      @scan = ScanCoordinator.new(environment: @environment, adapter: adapter).call
+      @scan = ScanCoordinator.new(environment: @environment, adapter: adapter).call(resource_types: %w[ec2 s3])
     end
 
     assert_equal "completed", @scan.status
@@ -55,7 +55,7 @@ class ScanCoordinatorTest < ActiveSupport::TestCase
     old = @environment.resources.create!(ec2_record.merge(resource_id: "i-previous"))
     error = { resource_type: "ec2", code: "aws_api_error", message: "EC2 unavailable." }
     adapter = FakeAdapter.new(resources: [ ec2_record, s3_record ], errors: [ error ])
-    scan = ScanCoordinator.new(environment: @environment, adapter: adapter).call
+    scan = ScanCoordinator.new(environment: @environment, adapter: adapter).call(resource_types: %w[ec2 s3])
 
     assert_equal "partial", scan.status
     assert_equal 1, scan.discovered_count
@@ -84,7 +84,7 @@ class ScanCoordinatorTest < ActiveSupport::TestCase
       { resource_type: "connection", code: "invalid_context", message: "Invalid context." }
     ])
     assert_no_difference "Resource.count" do
-      scan = ScanCoordinator.new(environment: @environment, adapter: adapter).call
+      scan = ScanCoordinator.new(environment: @environment, adapter: adapter).call(resource_types: %w[ec2 s3])
       assert_equal "failed", scan.status
     end
   end
@@ -92,7 +92,7 @@ class ScanCoordinatorTest < ActiveSupport::TestCase
   test "malformed adapter response records safe failure and does not write" do
     adapter = FakeAdapter.new(resources: "bad response", errors: [])
     assert_no_difference "Resource.count" do
-      scan = ScanCoordinator.new(environment: @environment, adapter: adapter).call
+      scan = ScanCoordinator.new(environment: @environment, adapter: adapter).call(resource_types: %w[ec2 s3])
       assert_equal "failed", scan.status
       assert_equal "discovery_failed", scan.error_details.first.fetch("code")
     end
@@ -132,7 +132,7 @@ class ScanCoordinatorTest < ActiveSupport::TestCase
         environment: @environment,
         adapter: adapter,
         sync_factory: failing_sync
-      ).call
+      ).call(resource_types: %w[ec2 s3])
 
       assert_equal "failed", scan.status
       assert_equal 0, scan.discovered_count
@@ -148,7 +148,7 @@ class ScanCoordinatorTest < ActiveSupport::TestCase
 
   test "successful refresh preserves personalization and database identity" do
     ScanCoordinator.new(environment: @environment,
-      adapter: FakeAdapter.new(resources: [ ec2_record, s3_record ], errors: [])).call
+      adapter: FakeAdapter.new(resources: [ ec2_record, s3_record ], errors: [])).call(resource_types: %w[ec2 s3])
     @environment.resources.each { |resource| resource.update!(pinned: true, hidden: true) }
     original_ids = @environment.resources.order(:id).pluck(:id)
     refreshed = [
@@ -157,7 +157,7 @@ class ScanCoordinatorTest < ActiveSupport::TestCase
     ]
 
     scan = ScanCoordinator.new(environment: @environment,
-      adapter: FakeAdapter.new(resources: refreshed, errors: [])).call
+      adapter: FakeAdapter.new(resources: refreshed, errors: [])).call(resource_types: %w[ec2 s3])
 
     assert_equal "completed", scan.status
     assert_equal 0, scan.created_count
@@ -171,14 +171,14 @@ class ScanCoordinatorTest < ActiveSupport::TestCase
 
   test "partial and failed scans leave personalized inventory untouched" do
     ScanCoordinator.new(environment: @environment,
-      adapter: FakeAdapter.new(resources: [ ec2_record, s3_record ], errors: [])).call
+      adapter: FakeAdapter.new(resources: [ ec2_record, s3_record ], errors: [])).call(resource_types: %w[ec2 s3])
     @environment.resources.each { |resource| resource.update!(pinned: true, hidden: true) }
     snapshot = @environment.resources.order(:id).map(&:attributes)
 
     partial = ScanCoordinator.new(environment: @environment, adapter: FakeAdapter.new(
       resources: [ ec2_record.merge(name: "Must not apply"), s3_record ],
       errors: [ { resource_type: "ec2", code: "aws_api_error", message: "EC2 unavailable." } ]
-    )).call
+    )).call(resource_types: %w[ec2 s3])
     assert_equal "partial", partial.status
     assert_equal 0, partial.created_count
     assert_equal 0, partial.updated_count
@@ -190,7 +190,7 @@ class ScanCoordinatorTest < ActiveSupport::TestCase
         { resource_type: "ec2", code: "credentials_unavailable", message: "No credentials." },
         { resource_type: "s3", code: "credentials_unavailable", message: "No credentials." }
       ]
-    )).call
+    )).call(resource_types: %w[ec2 s3])
     assert_equal "failed", failed.status
     assert_equal snapshot, @environment.resources.order(:id).map(&:attributes)
   end
